@@ -56,9 +56,16 @@ const DIRECTION_QUEUE_DEPTH = 2;
 export const SCOREBOARD_SIZE = 5;
 
 /**
- * The numbers a round is played by, injected into every transition that needs
- * them. Production code only ever passes `DEFAULT_RULES`; tests shrink the
- * board so spawn and collision arithmetic stays checkable by hand.
+ * The gameplay constants a round is played by, injected into every transition
+ * that needs them. Production code only ever passes `DEFAULT_RULES`; tests
+ * shrink the board so spawn and collision arithmetic stays checkable by hand.
+ *
+ * `initialDirection` is not a free knob: `engine.ts`'s `initialSnake` lays the
+ * body along `-x` unconditionally and assumes `cols > initialSnakeLength`, so
+ * any `initialDirection` other than `'right'` produces a snake perpendicular to
+ * its own body — a turn back along that body is then not a 180° and is accepted,
+ * killing the snake on the next tick. `DEFAULT_RULES` is the only coherent
+ * instance: test rules may shrink the board, not re-point the snake.
  */
 export interface Rules {
   readonly cols: number;

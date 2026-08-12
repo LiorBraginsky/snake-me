@@ -98,7 +98,7 @@ Three smaller clauses belong to the same API contract:
   it is what makes a seeded spawn predictable: draw `0` is the first free cell,
   `0.999…` the last.
 - **The tick phase order is a contract**: queue head → wall check → eat test,
-  tail drop, self check → boost countdown → new snake → boost pickup → boost
+  tail drop, self check → new snake → boost countdown → boost pickup → boost
   TTL → apple respawn (draw 1) → boost roll (draw 2) and its cell (draw 3).
   Three of those orderings carry meaning: the countdown sits after both
   collision checks because a death tick changes no counter (above), pickup
