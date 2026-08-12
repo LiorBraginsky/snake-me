@@ -194,7 +194,7 @@ interface Theme {
 |------|---------|----------|
 | Typecheck | `pnpm typecheck` | TS strict; theme token completeness |
 | Lint | `pnpm lint` | ESLint + `eslint-plugin-boundaries` (FSD layers, no deep imports) + Prettier |
-| Unit / component | `pnpm test` | vitest: engine golden tests; solid-testing-library for session & theming |
+| Tests (logic only) | `pnpm test` | logic tests only: engine golden tests, storage fallback paths, game-session semantics (pause/queue). No render, markup or snapshot tests; UI correctness is carried by the behavioral demo gate and the single Playwright smoke (chunk 06) |
 | E2E smoke | `pnpm test:e2e` | Playwright, 1 spec: start → snake moves → score grows |
 | Build | `pnpm build` | Vite production build |
 
