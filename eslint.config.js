@@ -112,6 +112,17 @@ export default tseslint.config(
     },
   },
 
+  // The boundaries invariant guards the direction of PRODUCTION dependencies.
+  // A colocated `*.test.ts` importing `vitest`, or reaching into a sibling
+  // slice's internals to set up a fixture, is not a production dependency —
+  // the file never enters the bundle (`vite build` only ever sees `src/app`'s
+  // graph, and Vitest excludes `*.test.*` from coverage of the shipped app).
+  // Accepted cost: a test file can deep-import across a slice boundary
+  // instead of going through the target's index.ts. That is deliberate — the
+  // exception is scoped to the test glob only, so no production file gains
+  // that freedom.
+  { files: ['src/**/*.test.{ts,tsx}'], rules: { 'boundaries/dependencies': 'off' } },
+
   // Must stay last: switches off every stylistic rule Prettier owns.
   prettier,
 );
