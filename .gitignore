@@ -1,0 +1,16 @@
+# deps / build
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# process state (agentic conveyor — never product truth)
+.claude/orchestration.md
+.claude/work/
+.claude/settings.local.json
+.superpowers/
+
+# misc
+.DS_Store
+*.log
