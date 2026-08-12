@@ -64,6 +64,11 @@ export default tseslint.config(
           // Also check npm / node-builtin imports, so `entities` can be pinned
           // to literally zero dependencies.
           checkAllOrigins: true,
+          // Without this, any src/ file matching NO pattern in
+          // boundaries/elements (e.g. a stray src/helpers.ts) is invisible to
+          // the rule, and importing it from anywhere is silently allowed —
+          // a direct hole in the CLAUDE.md layer-boundary invariant.
+          checkUnknownLocals: true,
           policies: [
             // Every layer except `entities` may use npm packages.
             {

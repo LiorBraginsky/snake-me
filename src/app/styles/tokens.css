@@ -2,5 +2,12 @@
   :root {
     --app-font: system-ui, sans-serif;
     --app-gap: 1rem;
+
+    /* Board dimensions (spec §3). Chunk 04 must derive these from the named
+       constants in entities/game/rules.ts instead of restating them here —
+       this is a single named place to duplicate against until that slice
+       exists. */
+    --board-cols: 16;
+    --board-rows: 24;
   }
 }

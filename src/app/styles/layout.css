@@ -13,7 +13,7 @@
     width: 100%;
     max-width: 20rem;
     /* Portrait 16 x 24 board (spec §3). */
-    aspect-ratio: 16 / 24;
+    aspect-ratio: var(--board-cols) / var(--board-rows);
     border: 1px dashed currentColor;
   }
 }
