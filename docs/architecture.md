@@ -8,10 +8,10 @@ Frozen reasoning lives in `docs/adr/`. Gameplay and visual truth live in
 `docs/specs/2026-08-12-snake-game-design.md`. This file is the map, not the
 territory and not the argument.
 
-- **Last synced:** chunk 02 — game core
-- **State of the tree:** `app/` renders a placeholder shell and owns the CSS
-  cascade; `entities/game` is live — a pure, deterministic engine with golden
-  tests. The other seven slices are `index.ts` stubs (a comment plus
+- **Last synced:** chunk 03 — input, session, loop
+- **State of the tree:** `app/` still renders a placeholder shell and owns the
+  CSS cascade; `entities/game`, `shared/input` and `features/game-session` are
+  live. The remaining five slices are `index.ts` stubs (a comment plus
   `export {}`).
 
 ## Layers
@@ -96,7 +96,7 @@ checks that they agree.
 
 | Slice | Status | Contents | Lands in |
 |-------|--------|----------|----------|
-| `game-session/` | stub | `createGameSession` (signals, start/pause/restart, input binding), `createGameLoop` (rAF + accumulator) | 03 |
+| `game-session/` | live | `createGameSession` (engine state in one signal, `dispatch`, start / togglePause / restart / tick), `createGameLoop` (rAF + accumulator, `FrameScheduler` port) | 03 |
 | `theming/` | stub | Theme registry (6 themes), `applyTheme`, `createThemeState` | 05 |
 
 ### `entities/` — domain
@@ -120,7 +120,7 @@ import against.
 
 | Slice | Status | Contents | Lands in |
 |-------|--------|----------|----------|
-| `input/` | stub | Keyboard → `ControlSignal`; no game knowledge | 03 |
+| `input/` | live | `createKeyboardControls`, `ControlSignal`, `KeyDownTarget` port; imports nothing at all | 03 |
 | `storage/` | stub | `KeyValueStore` port + `localStorage` adapter, versioned keys | 05 |
 
 ## Data flow
@@ -137,6 +137,16 @@ The engine is a pure reducer: `createInitialState`, `start`, `togglePause`,
 engine when the elapsed time exceeds `tickIntervalMs(state, rules)`. That is the
 function the loop calls for the current (boost-derived) interval; the boost
 multiplier is applied there and nowhere else, so no caller restates `1.6`.
+
+The loop takes at most one tick per frame and drops a stalled backlog with
+`accumulated %= interval` rather than replaying it — a multi-interval gap means
+the tab was asleep, not that the snake owes the player a fast-forward into a
+wall. The session and the loop are headless: `Rules`, `Rng`, a `FrameScheduler`
+and a `KeyDownTarget` all arrive as injected values, none as an ambient global.
+The composition root supplies all four in chunk 04 — `window` satisfies both
+ports structurally, and `createSeededRng(Date.now())` supplies the rng, per
+[ADR 0004](adr/0004-engine-api.md). See
+[ADR 0005](adr/0005-headless-session-ports.md).
 
 Theme tokens cross into CSS exactly once, in `applyTheme`; components read
 `var(--token)` and never token values in JS ([ADR 0003](adr/0003-theme-model.md)).
@@ -157,6 +167,7 @@ it stops being a rule.
 | Theme token completeness | `pnpm typecheck` | `ThemeTokens` is a closed required record |
 | TS strict across the repo | `pnpm typecheck` | `tsc --noEmit`, `strict: true` |
 | Engine determinism (seeded RNG, golden tests) | `pnpm test` | vitest, environment `node` — and `node` is the **final** state, not a staging one: the project tests logic only (spec §8), so jsdom is never added |
+| Session and engine are headless (no ambient DOM, clock or `Date`) | `pnpm lint` | `no-restricted-globals`, scoped to `src/entities/**` and `src/features/game-session/**`, tests excluded — `features/theming` is deliberately out of scope ([ADR 0003](adr/0003-theme-model.md)) |
 | Behaviour end to end | `pnpm test:e2e` | Playwright smoke — a stub script until chunk 06, already wired into CI so chunk 06 replaces a script body rather than the workflow |
 | Formatting | `pnpm lint` | `prettier --check .` |
 
@@ -324,3 +335,4 @@ lint error, and the answer is to find the layer it belongs in.
 | [0002](adr/0002-trimmed-fsd.md) | Trimmed FSD, one-way imports, pure `entities/game` | proposed |
 | [0003](adr/0003-theme-model.md) | Typed theme registry + CSS custom properties | proposed |
 | [0004](adr/0004-engine-api.md) | Engine API: injected `Rules` and `Rng`, no-op transitions return their input, board-full ends the round | proposed |
+| [0005](adr/0005-headless-session-ports.md) | Headless session: time and input as ports the composition root supplies | proposed |

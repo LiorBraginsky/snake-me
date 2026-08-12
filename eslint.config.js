@@ -134,6 +134,30 @@ export default tseslint.config(
   // that freedom.
   { files: ['src/**/*.test.{ts,tsx}'], rules: { 'boundaries/dependencies': 'off' } },
 
+  // The engine and the game session are headless by contract (ADR 0005): time,
+  // input and randomness arrive as injected ports, never as ambient globals.
+  // `boundaries/dependencies` structurally cannot see this — a global is not an
+  // import — so it needs its own rule. `features/theming` is deliberately NOT in
+  // this glob: writing theme tokens onto the document is exactly its job
+  // (ADR 0003). Tests are exempt for the same reason they are exempt from the
+  // boundaries rules, and because the compile-time `window` proofs live there.
+  {
+    files: ['src/entities/**/*.{ts,tsx}', 'src/features/game-session/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        { name: 'window', message: 'Headless by contract: take a port (ADR 0005).' },
+        { name: 'document', message: 'Headless by contract: take a port (ADR 0005).' },
+        { name: 'localStorage', message: 'Headless by contract: take a port (ADR 0005).' },
+        { name: 'requestAnimationFrame', message: 'Take a FrameScheduler port (ADR 0005).' },
+        { name: 'cancelAnimationFrame', message: 'Take a FrameScheduler port (ADR 0005).' },
+        { name: 'performance', message: 'Time arrives as the frame timestamp (ADR 0005).' },
+        { name: 'Date', message: 'Determinism: the caller supplies clock values (ADR 0004).' },
+      ],
+    },
+  },
+
   // Must stay last: switches off every stylistic rule Prettier owns.
   prettier,
 );
