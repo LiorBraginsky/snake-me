@@ -14,7 +14,7 @@ Deployed to GitHub Pages.
 
 **Goals**
 
-- Classic snake gameplay, polished feel, portrait board.
+- Classic snake gameplay, polished feel, landscape board.
 - Architecture that reads as a statement: trimmed FSD, one-way dependencies,
   a pure deterministic game core, a token-driven theme layer.
 - Every rule that matters is *executable* (lint, typecheck, tests) — not prose.
@@ -44,7 +44,7 @@ Deployed to GitHub Pages.
 
 ### Board & lifecycle
 
-- Grid **16 × 24** (portrait, width × height). Walls are solid: leaving the
+- Grid **24 × 16** (landscape, width × height). Walls are solid: leaving the
   board is game over (no wrap-around).
 - Statuses: `idle → running ⇄ paused → game-over → running (restart)`.
 - Game starts in `idle`; a **Start button** begins the round (never auto-start).
