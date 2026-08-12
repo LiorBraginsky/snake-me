@@ -67,6 +67,8 @@ Deployed to GitHub Pages.
 
 - Picking a boost while one is active **extends the timer** (resets duration);
   the multiplier never stacks.
+- "5 s" is implemented as a tick-count constant (`BOOST_DURATION_TICKS`,
+  computed from the boosted interval) — the engine counts ticks, not wall-clock.
 - Death: wall or own body.
 - **Scoreboard**: top-5 results (`score` + ISO date), persisted, shown on game over.
 
@@ -171,8 +173,11 @@ interface Theme {
   `data-theme="<id>"`.
 - **Six themes:** `dark-checker` (default, classic colors), `dark-solid`,
   `light-checker`, `light-solid`, `nokia` (monochrome LCD), `neon`.
-- Contrast rule: snake and items must stay legible on both checker cells in
-  every theme (verified visually per theme at the demo gate).
+- Themes may share one `SpriteSet` recolored via tokens (the four base themes
+  do) or override it with their own shapes (`nokia`, `neon` may).
+- Contrast rule: snake and items must stay legible on every board background a
+  theme uses (both checker cells, or the solid fill) — verified per theme at
+  the demo gate.
 
 ## 7. Storage
 
