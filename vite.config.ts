@@ -6,8 +6,9 @@ export default defineConfig({
   base: '/snake-me/',
   plugins: [solid()],
   test: {
-    // No DOM needed yet: the engine (chunk 02) is pure TS, and component tests
-    // with jsdom + solid-testing-library arrive with the first widget.
+    // 'node' is the final environment, not a staging choice: spec §8's testing
+    // policy is logic tests only (engine, storage, game-session semantics) —
+    // no render/markup/snapshot tests, so jsdom is never coming.
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}', 'test/**/*.test.{ts,tsx}'],
   },
