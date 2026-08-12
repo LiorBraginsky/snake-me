@@ -1,0 +1,19 @@
+@layer layout {
+  .app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--app-gap);
+    min-height: 100vh;
+    padding: var(--app-gap);
+    font-family: var(--app-font);
+  }
+
+  .app__stage-placeholder {
+    width: 100%;
+    max-width: 20rem;
+    /* Portrait 16 x 24 board (spec §3). */
+    aspect-ratio: var(--board-cols) / var(--board-rows);
+    border: 1px dashed currentColor;
+  }
+}

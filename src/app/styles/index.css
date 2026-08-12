@@ -1,0 +1,8 @@
+/* Cascade order for the whole app. Declared once, here, before anything else:
+   later layers always win, regardless of import order or selector specificity. */
+@layer reset, tokens, layout, theme;
+
+@import './reset.css';
+@import './tokens.css';
+@import './layout.css';
+@import './theme.css';

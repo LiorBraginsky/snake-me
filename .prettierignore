@@ -1,0 +1,7 @@
+# Generated.
+pnpm-lock.yaml
+
+# Markdown is hand-authored (spec, CLAUDE.md, ADRs). Prettier reflows tables and
+# lists, which would rewrite documents this project treats as truth. Prettier's
+# job here is code and config formatting.
+*.md
