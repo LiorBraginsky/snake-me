@@ -14,7 +14,7 @@ Deployed to GitHub Pages.
 
 **Goals**
 
-- Classic snake gameplay, polished feel, portrait board.
+- Classic snake gameplay, polished feel, landscape board.
 - Architecture that reads as a statement: trimmed FSD, one-way dependencies,
   a pure deterministic game core, a token-driven theme layer.
 - Every rule that matters is *executable* (lint, typecheck, tests) — not prose.
@@ -44,7 +44,7 @@ Deployed to GitHub Pages.
 
 ### Board & lifecycle
 
-- Grid **16 × 24** (portrait, width × height). Walls are solid: leaving the
+- Grid **24 × 16** (landscape, width × height). Walls are solid: leaving the
   board is game over (no wrap-around).
 - Statuses: `idle → running ⇄ paused → game-over → running (restart)`.
 - Game starts in `idle`; a **Start button** begins the round (never auto-start).
@@ -117,15 +117,22 @@ src/
 createInitialState(rules, rng): GameState
 start(state): GameState
 togglePause(state): GameState
-turn(state, dir): GameState        // validates 180°, enqueues (depth 2)
-tick(state, rng): GameState        // consumes queue head, moves, eats, collides
-restart(state, rules, rng): GameState
+turn(state, rules, direction): GameState // validates 180°, enqueues (depth 2)
+tick(state, rules, rng): GameState       // moves, eats, collides, respawns
+restart(rules, rng): GameState           // a fresh round, already running
+tickIntervalMs(state, rules): number     // derived interval; the loop reads it
 ```
 
 `GameState` holds snake segments, direction + queue, items (`food`, optional
 `boost` with `ttlTicks`), score, status, `boostTicksRemaining`. Effective tick
-interval is **derived**: `BASE_TICK / (boost active ? 1.6 : 1)`. RNG is an
-injected interface (seeded in tests).
+interval is **derived**: `BASE_TICK / (boost active ? 1.6 : 1)` — exposed as
+`tickIntervalMs`, so the game loop reads it instead of restating the multiplier
+outside `rules.ts`. RNG is an injected interface (seeded in tests), and `Rules`
+is injected the same way: a transition that needs a gameplay number takes it as
+a parameter rather than importing it, which is what lets tests shrink the board.
+Production code only ever passes `DEFAULT_RULES`. Argument order is uniformly
+**state, rules, payload**; rationale and rejected alternatives in
+`docs/adr/0004-engine-api.md`.
 
 ### Data flow
 

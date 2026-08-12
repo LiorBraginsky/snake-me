@@ -8,10 +8,11 @@ Frozen reasoning lives in `docs/adr/`. Gameplay and visual truth live in
 `docs/specs/2026-08-12-snake-game-design.md`. This file is the map, not the
 territory and not the argument.
 
-- **Last synced:** chunk 01 — walking skeleton
-- **State of the tree:** `app/` is real — it renders a placeholder shell and owns
-  the CSS cascade. The other eight slices are `index.ts` stubs (a comment plus
-  `export {}`). No gameplay code yet.
+- **Last synced:** chunk 02 — game core
+- **State of the tree:** `app/` renders a placeholder shell and owns the CSS
+  cascade; `entities/game` is live — a pure, deterministic engine with golden
+  tests. The other seven slices are `index.ts` stubs (a comment plus
+  `export {}`).
 
 ## Layers
 
@@ -73,14 +74,15 @@ the cascade order never has to change when `features/theming` starts writing
 theme tokens in chunk 05 ([ADR 0003](adr/0003-theme-model.md)).
 
 **Known duplication — board dimensions, owner chunk 04.** `styles/tokens.css`
-defines `--board-cols: 16` / `--board-rows: 24` and `styles/layout.css` derives
+defines `--board-cols: 24` / `--board-rows: 16` and `styles/layout.css` derives
 the placeholder box from them (`aspect-ratio: var(--board-cols) /
 var(--board-rows)`). Those are gameplay numbers, and `CLAUDE.md` puts gameplay
-numbers in `entities/game/rules.ts` — which does not exist until chunk 02. This
-is a chunk-01 placeholder, not a second home for the board size: **chunk 04**
-must derive the custom properties from `rules.ts` when it builds the real stage,
-and delete the literals here. Until then the board size is stated in two places
-and nothing checks that they agree.
+numbers in `entities/game/rules.ts` — which exists as of chunk 02 and exports
+them as `DEFAULT_RULES.cols` / `DEFAULT_RULES.rows`. This is a chunk-01
+placeholder, not a second home for the board size: **chunk 04** must derive the
+custom properties from `rules.ts` when it builds the real stage, and delete the
+literals here. Until then the board size is stated in two places and nothing
+checks that they agree.
 
 ### `widgets/` — composed UI
 
@@ -101,7 +103,18 @@ and nothing checks that they agree.
 
 | Slice | Status | Contents | Lands in |
 |-------|--------|----------|----------|
-| `game/` | stub | `types.ts`, `rules.ts` (all gameplay constants), `engine.ts` (pure reducer), `rng.ts` (port + seedable impl), `scoreboard.ts` | 02 |
+| `game/` | live | `types.ts`, `rules.ts` (all gameplay constants + `DEFAULT_RULES`), `board.ts` (board/direction geometry, slice-internal), `engine.ts` (pure reducer), `rng.ts` (`Rng` port + mulberry32 `createSeededRng`), `scoreboard.ts` | 02 |
+
+The engine takes its configuration as a value: `Rules` and `Rng` are injected
+into every transition that needs them (`createInitialState(rules, rng)`,
+`turn(state, rules, direction)`, `tick(state, rules, rng)`,
+`restart(rules, rng)`, `tickIntervalMs(state, rules)`). Spec §4 originally
+sketched `tick(state, rng)`, a signature with no access to the board bounds it
+needs; the snippet was corrected to match the code in chunk 02 — see ADR 0004.
+Production code only ever passes `DEFAULT_RULES`; tests shrink the board so
+spawn and collision arithmetic stays checkable by hand. `board.ts` is not
+re-exported from `index.ts`: the public surface is the contract chunks 03–05
+import against.
 
 ### `shared/` — ports & adapters
 
@@ -119,9 +132,11 @@ theme state ─CSS custom properties─▶ stage & HUD
 ```
 
 The engine is a pure reducer: `createInitialState`, `start`, `togglePause`,
-`turn`, `tick`, `restart` (spec §4). It is driven by `createGameLoop` —
-`requestAnimationFrame` plus an accumulator that advances the engine when the
-elapsed time exceeds the current (boost-derived) tick interval.
+`turn`, `tick`, `restart`, `tickIntervalMs` (spec §4). It is driven by
+`createGameLoop` — `requestAnimationFrame` plus an accumulator that advances the
+engine when the elapsed time exceeds `tickIntervalMs(state, rules)`. That is the
+function the loop calls for the current (boost-derived) interval; the boost
+multiplier is applied there and nowhere else, so no caller restates `1.6`.
 
 Theme tokens cross into CSS exactly once, in `applyTheme`; components read
 `var(--token)` and never token values in JS ([ADR 0003](adr/0003-theme-model.md)).
@@ -308,3 +323,4 @@ lint error, and the answer is to find the layer it belongs in.
 | [0001](adr/0001-solid-js.md) | Solid.js + TypeScript (strict) + Vite; DOM rendering, no canvas | proposed |
 | [0002](adr/0002-trimmed-fsd.md) | Trimmed FSD, one-way imports, pure `entities/game` | proposed |
 | [0003](adr/0003-theme-model.md) | Typed theme registry + CSS custom properties | proposed |
+| [0004](adr/0004-engine-api.md) | Engine API: injected `Rules` and `Rng`, no-op transitions return their input, board-full ends the round | proposed |

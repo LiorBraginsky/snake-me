@@ -13,7 +13,7 @@ the constraints:
 
 - **Static hosting only.** No backend, no accounts (spec §1). The build is a
   bundle on GitHub Pages, so payload size is a visible quality signal.
-- **Small, hot render surface.** A 16 × 24 board advancing every 150 ms
+- **Small, hot render surface.** A 24 × 16 board advancing every 150 ms
   (spec §3). Each tick moves a handful of cells; the static board background
   and the walls never change during a round.
 - **A pure core that must stay framework-free.** The engine is a deterministic
@@ -93,7 +93,7 @@ state in signals. Nothing below that layer knows Solid exists.
   with a hand-rolled reactivity layer: the same work, less rigorously, with
   nothing to show for it.
 - **Canvas / WebGL rendering** (spec §2, decision 2) — the reflex choice for
-  games, and wrong at this scale. A 16 × 24 grid at ~7 ticks/s is not a DOM
+  games, and wrong at this scale. A 24 × 16 grid at ~7 ticks/s is not a DOM
   performance problem, while canvas would cost us CSS-custom-property theming,
   inspectable markup, and free layout and accessibility.
 
