@@ -1,0 +1,6 @@
+@layer tokens {
+  :root {
+    --app-font: system-ui, sans-serif;
+    --app-gap: 1rem;
+  }
+}

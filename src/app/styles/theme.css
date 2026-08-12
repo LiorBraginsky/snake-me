@@ -1,0 +1,5 @@
+@layer theme {
+  /* Intentionally empty. Theme tokens (spec §6) are written here as CSS custom
+     properties by `features/theming` in chunk 05. The layer exists from day one
+     so the cascade order never has to change. */
+}
