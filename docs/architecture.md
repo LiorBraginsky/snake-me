@@ -320,3 +320,4 @@ lint error, and the answer is to find the layer it belongs in.
 | [0001](adr/0001-solid-js.md) | Solid.js + TypeScript (strict) + Vite; DOM rendering, no canvas | proposed |
 | [0002](adr/0002-trimmed-fsd.md) | Trimmed FSD, one-way imports, pure `entities/game` | proposed |
 | [0003](adr/0003-theme-model.md) | Typed theme registry + CSS custom properties | proposed |
+| [0004](adr/0004-engine-api.md) | Engine API: injected `Rules` and `Rng`, no-op transitions return their input, board-full ends the round | proposed |
