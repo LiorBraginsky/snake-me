@@ -109,6 +109,17 @@ export default tseslint.config(
           ],
         },
       ],
+      // `checkUnknownLocals` above closes the TARGET side of a dependency
+      // edge (an import that points AT an unclassified file). It does
+      // nothing for the SOURCE side: `boundaries/dependencies` registers no
+      // visitors at all when both ends of an edge are unknown, so a file
+      // that is itself unclassified — anything under src/ matching no
+      // `boundaries/elements` pattern, e.g. a stray src/utils.ts — can
+      // import absolutely anything and lint stays green. That is exactly
+      // the grab-bag util module CLAUDE.md forbids, smuggled past the
+      // architecture. This rule closes the source side: any file under
+      // src/ that belongs to no element is itself an error.
+      'boundaries/no-unknown-files': 'error',
     },
   },
 
