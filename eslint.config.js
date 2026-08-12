@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import boundaries from 'eslint-plugin-boundaries';
 import prettier from 'eslint-config-prettier';
 import solid from 'eslint-plugin-solid';
 import tseslint from 'typescript-eslint';
@@ -22,7 +23,89 @@ export default tseslint.config(
     rules: solid.configs['flat/typescript'].rules,
   },
 
-  // <<< FSD boundaries block is inserted here in Step 2 >>>
+  // Trimmed FSD, executable. One rule encodes all three invariants from
+  // CLAUDE.md / spec §4:
+  //   1. direction   — app -> widgets -> features -> entities -> shared, never up,
+  //                    never sideways between slices of one layer;
+  //   2. entry point — a slice is reachable only through its index.ts;
+  //   3. purity      — `entities` may import nothing at all, npm included.
+  // Scoped to src/: config files, tests outside src/ and tooling are not elements.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    plugins: { boundaries },
+    settings: {
+      // eslint-plugin-boundaries resolves import specifiers via
+      // eslint-module-utils/resolve, which defaults to the bundled
+      // eslint-import-resolver-node with extensions ['.mjs', '.js', '.json',
+      // '.node'] — no TypeScript. Without '.ts'/'.tsx' here, every relative
+      // import to a .tsx file or a directory's index.ts resolves to an
+      // "unknown" element, and `checkUnknownLocals` defaults to false, so
+      // unresolved local dependencies are silently skipped: the rule never
+      // fires on ANY import in this codebase, allow or disallow alike.
+      'import/resolver': {
+        node: {
+          extensions: ['.mjs', '.js', '.json', '.node', '.ts', '.tsx'],
+        },
+      },
+      'boundaries/elements': [
+        { type: 'app', pattern: 'src/app', partialMatch: false },
+        { type: 'widget', pattern: 'src/widgets/*', partialMatch: false, capture: ['slice'] },
+        { type: 'feature', pattern: 'src/features/*', partialMatch: false, capture: ['slice'] },
+        { type: 'entity', pattern: 'src/entities/*', partialMatch: false, capture: ['slice'] },
+        { type: 'shared', pattern: 'src/shared/*', partialMatch: false, capture: ['slice'] },
+      ],
+    },
+    rules: {
+      'boundaries/dependencies': [
+        'error',
+        {
+          // Nothing is permitted unless a policy below says so.
+          default: 'disallow',
+          // Also check npm / node-builtin imports, so `entities` can be pinned
+          // to literally zero dependencies.
+          checkAllOrigins: true,
+          policies: [
+            // Every layer except `entities` may use npm packages.
+            {
+              from: { element: { type: ['app', 'widget', 'feature', 'shared'] } },
+              allow: { to: { module: { origin: 'external' } } },
+            },
+            // Downward only, and only through the target slice's public API.
+            {
+              from: { element: { type: 'app' } },
+              allow: {
+                to: {
+                  element: {
+                    type: ['widget', 'feature', 'entity', 'shared'],
+                    fileInternalPath: 'index.ts',
+                  },
+                },
+              },
+            },
+            {
+              from: { element: { type: 'widget' } },
+              allow: {
+                to: {
+                  element: { type: ['feature', 'entity', 'shared'], fileInternalPath: 'index.ts' },
+                },
+              },
+            },
+            {
+              from: { element: { type: 'feature' } },
+              allow: {
+                to: { element: { type: ['entity', 'shared'], fileInternalPath: 'index.ts' } },
+              },
+            },
+            // `entities` gets no allow-policy on purpose. With default:"disallow"
+            // and checkAllOrigins:true that means: no shared, no npm, no node
+            // builtins. Today the layer holds exactly one slice, `entities/game`
+            // (spec §4), so this is the CLAUDE.md invariant, stated one notch
+            // stricter. A future second entity slice must revisit this.
+          ],
+        },
+      ],
+    },
+  },
 
   // Must stay last: switches off every stylistic rule Prettier owns.
   prettier,
