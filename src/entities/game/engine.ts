@@ -10,7 +10,7 @@ export function createInitialState(rules: Rules, rng: Rng): GameState {
   return {
     status: 'idle',
     snake,
-    direction: 'right',
+    direction: rules.initialDirection,
     queue: [],
     food: cell === undefined ? undefined : { kind: 'food', at: cell },
     boost: undefined,

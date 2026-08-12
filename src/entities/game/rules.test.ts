@@ -14,6 +14,10 @@ describe('DEFAULT_RULES', () => {
     expect(Number.isInteger(DEFAULT_RULES.boostDurationTicks)).toBe(true);
   });
 
+  it('names the starting direction from spec §3', () => {
+    expect(DEFAULT_RULES.initialDirection).toBe('right');
+  });
+
   it('names every other spec §3 number', () => {
     expect(DEFAULT_RULES.baseTickMs).toBe(150);
     expect(DEFAULT_RULES.boostMultiplier).toBe(1.6);

@@ -108,12 +108,13 @@ checks that they agree.
 The engine takes its configuration as a value: `Rules` and `Rng` are injected
 into every transition that needs them (`createInitialState(rules, rng)`,
 `turn(state, rules, direction)`, `tick(state, rules, rng)`,
-`restart(rules, rng)`, `tickIntervalMs(state, rules)`). That deviates from the
-literal signatures in spec §4, which give `tick` no access to the board bounds
-it needs — see ADR 0004. Production code only ever passes `DEFAULT_RULES`;
-tests shrink the board so spawn and collision arithmetic stays checkable by
-hand. `board.ts` is not re-exported from `index.ts`: the public surface is the
-contract chunks 03–05 import against.
+`restart(rules, rng)`, `tickIntervalMs(state, rules)`). Spec §4 originally
+sketched `tick(state, rng)`, a signature with no access to the board bounds it
+needs; the snippet was corrected to match the code in chunk 02 — see ADR 0004.
+Production code only ever passes `DEFAULT_RULES`; tests shrink the board so
+spawn and collision arithmetic stays checkable by hand. `board.ts` is not
+re-exported from `index.ts`: the public surface is the contract chunks 03–05
+import against.
 
 ### `shared/` — ports & adapters
 
@@ -131,9 +132,11 @@ theme state ─CSS custom properties─▶ stage & HUD
 ```
 
 The engine is a pure reducer: `createInitialState`, `start`, `togglePause`,
-`turn`, `tick`, `restart` (spec §4). It is driven by `createGameLoop` —
-`requestAnimationFrame` plus an accumulator that advances the engine when the
-elapsed time exceeds the current (boost-derived) tick interval.
+`turn`, `tick`, `restart`, `tickIntervalMs` (spec §4). It is driven by
+`createGameLoop` — `requestAnimationFrame` plus an accumulator that advances the
+engine when the elapsed time exceeds `tickIntervalMs(state, rules)`. That is the
+function the loop calls for the current (boost-derived) interval; the boost
+multiplier is applied there and nowhere else, so no caller restates `1.6`.
 
 Theme tokens cross into CSS exactly once, in `applyTheme`; components read
 `var(--token)` and never token values in JS ([ADR 0003](adr/0003-theme-model.md)).

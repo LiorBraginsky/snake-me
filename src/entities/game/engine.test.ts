@@ -81,18 +81,40 @@ describe('lifecycle', () => {
     expect(state.boostTicksRemaining).toBe(0);
   });
 
-  it('places the first apple with one draw, on a free cell', () => {
-    const state = createInitialState(DEFAULT_RULES, stubRng([0]));
+  it('takes its starting direction from the rules, not from a hardcoded one', () => {
+    const state = createInitialState({ ...DEFAULT_RULES, initialDirection: 'down' }, stubRng([0]));
 
-    expect(state.food).toEqual({ kind: 'food', at: { x: 0, y: 0 } });
+    expect(state.direction).toBe('down');
+  });
+
+  it('places the first apple with one draw, on a cell the snake does not hold', () => {
+    expect(createInitialState(DEFAULT_RULES, stubRng([0])).food).toEqual({
+      kind: 'food',
+      at: { x: 0, y: 0 },
+    });
+
+    // A draw that discriminates: the snake's three cells are excluded, so the
+    // free list is 381 long and floor(0.53 * 381) = 201 -> (9,8). Spread over
+    // all 384 cells the same draw would give (11,8) — a snake segment — so this
+    // is what pins that the apple never spawns under the snake.
+    expect(createInitialState(DEFAULT_RULES, stubRng([0.53])).food).toEqual({
+      kind: 'food',
+      at: { x: 9, y: 8 },
+    });
   });
 
   it('begins a round from idle, and from nowhere else', () => {
     const idle = createInitialState(DEFAULT_RULES, stubRng([0]));
     const started = start(idle);
+    const paused = togglePause(started);
+    const over: GameState = { ...started, status: 'game-over' };
 
     expect(started.status).toBe('running');
     expect(start(started)).toBe(started);
+    expect(start(paused)).toBe(paused);
+    // A finished round must never resume: `start` here would hand back the dead
+    // snake with its score intact instead of requiring a `restart`.
+    expect(start(over)).toBe(over);
   });
 
   it('toggles pause both ways', () => {
@@ -158,13 +180,20 @@ describe('turn', () => {
   it('drops a third turn — the queue is two deep', () => {
     let state = turn(running(), TINY, 'up');
     state = turn(state, TINY, 'left');
+    const full = state;
     state = turn(state, TINY, 'down');
 
     expect(state.queue).toEqual(['up', 'left']);
+    expect(state).toBe(full);
   });
 
   it('rejects a 180° turn against the current direction', () => {
-    expect(turn(running(), TINY, 'left').queue).toEqual([]);
+    const state = running();
+
+    expect(turn(state, TINY, 'left').queue).toEqual([]);
+    // By reference, not a clone: chunk 03 feeds this into a Solid signal, so a
+    // fresh object would re-render the board on every repeat of a held key.
+    expect(turn(state, TINY, 'left')).toBe(state);
   });
 
   it('rejects a 180° turn against the last queued direction', () => {
@@ -173,16 +202,21 @@ describe('turn', () => {
     const state = turn(running(), TINY, 'up');
 
     expect(turn(state, TINY, 'down').queue).toEqual(['up']);
+    expect(turn(state, TINY, 'down')).toBe(state);
   });
 
   it('ignores a turn that repeats the queued direction', () => {
     const state = turn(running(), TINY, 'up');
 
     expect(turn(state, TINY, 'up').queue).toEqual(['up']);
+    expect(turn(state, TINY, 'up')).toBe(state);
   });
 
   it('ignores a turn in the direction the snake already travels', () => {
-    expect(turn(running(), TINY, 'right').queue).toEqual([]);
+    const state = running();
+
+    expect(turn(state, TINY, 'right').queue).toEqual([]);
+    expect(turn(state, TINY, 'right')).toBe(state);
   });
 });
 
@@ -233,13 +267,33 @@ describe('tick — collisions', () => {
         { x: 3, y: 2 },
         { x: 2, y: 2 },
       ],
+      // Both survive the death tick untouched (D12): the queue head is read for
+      // the move but not consumed, and the boost counter does not tick down.
+      queue: ['right'],
+      boostTicksRemaining: 7,
+    });
+
+    expect(tick(state, TINY, stubRng([]))).toEqual({ ...state, status: 'game-over' });
+  });
+
+  it('ends the round when the head leaves the board through the top', () => {
+    // y = 0 is the top row, so one step up is off the board. Covered on its own
+    // because `y < rows` and `y >= 0` are separate halves of the wall check.
+    const state = running({
+      snake: [
+        { x: 2, y: 0 },
+        { x: 1, y: 0 },
+        { x: 0, y: 0 },
+      ],
+      direction: 'up',
     });
 
     expect(tick(state, TINY, stubRng([]))).toEqual({ ...state, status: 'game-over' });
   });
 
   it('ends the round when the head runs into its own body', () => {
-    // Built directly: `turn` can never produce this, which is the point.
+    // Built directly: `turn` can never produce this, which is the point — the
+    // queued reversal walks the head straight back into the neck at (2,1).
     const coiled = running({
       snake: [
         { x: 1, y: 1 },
@@ -249,6 +303,8 @@ describe('tick — collisions', () => {
         { x: 0, y: 2 },
       ],
       direction: 'down',
+      queue: ['right'],
+      boostTicksRemaining: 7,
     });
 
     expect(tick(coiled, TINY, stubRng([]))).toEqual({ ...coiled, status: 'game-over' });
@@ -307,6 +363,36 @@ describe('tick — apple', () => {
     const next = tick(state, TINY, stubRng([0]));
 
     expect(next.food).toEqual({ kind: 'food', at: { x: 1, y: 0 } });
+  });
+
+  it('never respawns the apple on an occupied cell, whatever the draw', () => {
+    const state = running({
+      snake: [
+        { x: 3, y: 2 },
+        { x: 2, y: 2 },
+        { x: 1, y: 2 },
+      ],
+      food: { kind: 'food', at: { x: 4, y: 2 } },
+      boost: { kind: 'boost', at: { x: 0, y: 0 }, ttlTicks: 5 },
+    });
+    // The five cells that are taken once the tick resolves: the grown snake
+    // plus the boost, which still holds (0,0).
+    const occupied = [
+      { x: 4, y: 2 },
+      { x: 3, y: 2 },
+      { x: 2, y: 2 },
+      { x: 1, y: 2 },
+      { x: 0, y: 0 },
+    ];
+    const cells = Array.from(
+      { length: 100 },
+      (_, index) => tick(state, TINY, stubRng([index / 100])).food?.at,
+    );
+
+    expect(cells).not.toContainEqual(undefined);
+    for (const cell of occupied) {
+      expect(cells).not.toContainEqual(cell);
+    }
   });
 
   it('ends the round when eating the last apple leaves no free cell', () => {
@@ -394,7 +480,7 @@ describe('tick — boost', () => {
     const next = tick(state, TINY, stubRng([]));
 
     expect(next.score).toBe(5);
-    expect(next.boostTicksRemaining).toBe(DEFAULT_RULES.boostDurationTicks);
+    expect(next.boostTicksRemaining).toBe(53);
   });
 
   it('extends the effect to full duration instead of stacking it', () => {
@@ -437,6 +523,42 @@ describe('determinism', () => {
 
     expect(first.status).toBe('running');
     expect(first.snake[0]).toEqual({ x: 19, y: 8 });
+    expect(first).toEqual(play());
+  });
+
+  it('pins a seeded round that spends four draws, as golden literals', () => {
+    // Seed 408 is chosen because its whole RNG budget is observable: the first
+    // apple lands at (15,8), three cells ahead of the starting head, so tick 3
+    // eats it and spends draw 2 on the respawn, draw 3 on a boost roll that
+    // succeeds and draw 4 on the boost's cell. The literals below therefore pin
+    // the PRNG's actual output, not just that the engine is a pure function of
+    // its inputs — swap mulberry32 for another generator and this test fails.
+    const play = (): GameState => {
+      const rng = createSeededRng(408);
+      let state = start(createInitialState(DEFAULT_RULES, rng));
+
+      expect(state.food).toEqual({ kind: 'food', at: { x: 15, y: 8 } });
+
+      for (let i = 0; i < 3; i += 1) {
+        state = tick(state, DEFAULT_RULES, rng);
+      }
+
+      return state;
+    };
+
+    const first = play();
+
+    expect(first.status).toBe('running');
+    expect(first.score).toBe(10);
+    expect(first.snake).toEqual([
+      { x: 15, y: 8 },
+      { x: 14, y: 8 },
+      { x: 13, y: 8 },
+      { x: 12, y: 8 },
+    ]);
+    expect(first.food).toEqual({ kind: 'food', at: { x: 1, y: 1 } });
+    expect(first.boost).toEqual({ kind: 'boost', at: { x: 23, y: 7 }, ttlTicks: 30 });
+    expect(first.boostTicksRemaining).toBe(0);
     expect(first).toEqual(play());
   });
 });

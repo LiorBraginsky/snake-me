@@ -53,11 +53,12 @@ restart(rules, rng): GameState
 tickIntervalMs(state, rules): number
 ```
 
-`rules.ts` names every gameplay number exactly once and exports the `Rules` type
-plus `DEFAULT_RULES` assembled from those constants. Production code passes
-`DEFAULT_RULES` and nothing else; only tests construct a different `Rules`.
-`CLAUDE.md`'s invariant is untouched — the numbers still live in exactly one
-file, they are just read through a parameter instead of an import.
+`rules.ts` names every gameplay constant exactly once — the numbers of spec §3
+plus the starting direction — and exports the `Rules` type plus `DEFAULT_RULES`
+assembled from them. Production code passes `DEFAULT_RULES` and nothing else;
+only tests construct a different `Rules`. `CLAUDE.md`'s invariant is untouched —
+the numbers still live in exactly one file, they are just read through a
+parameter instead of an import.
 
 **A no-op transition returns its input by reference**, not a clone: `turn` and
 `tick` outside `running`, `start` outside `idle`, `togglePause` outside
@@ -72,27 +73,39 @@ status**: spec §3's status set (`idle → running ⇄ paused → game-over`) is
 closed, and the requirement is that chunk 04's HUD and overlays handle exactly
 one terminal status with no special case.
 
+**A death tick is a pure status flip.** When the head hits a wall or its own
+body, `tick` returns `{ ...state, status: 'game-over' }` — the snake does not
+move, the queue head is not consumed and no counter changes, so
+`boostTicksRemaining` comes back exactly as it went in. Nothing downstream ever
+has to render a head outside the board or inside a segment, and the test is one
+exact-equality assertion. The board-full end (above) is the one game-over that
+*does* carry a moved snake, because that move was legal.
+
 Three smaller clauses belong to the same API contract:
 
 - **The `Rng` port is `{ next(): number }`**, uniform in the half-open range
   `[0, 1)` — `Math.random`'s contract. The shipped implementation is a seeded
   mulberry32 (`createSeededRng(seed)`), hand-written because the purity rule
   forbids an npm PRNG and because `Math.imul` plus unsigned shifts are
-  bit-identical on every JS engine. No `Math.random` adapter ships at all:
-  production non-determinism is `createSeededRng(Date.now())` at the call site,
-  above the slice.
+  bit-identical on every JS engine — `rng.test.ts` pins the first draws of two
+  seeds as a golden vector, so changing the algorithm or one of its constants
+  fails loudly instead of silently reshuffling every seeded round. No
+  `Math.random` adapter ships at all: production non-determinism is
+  `createSeededRng(Date.now())` at the call site, above the slice.
 - **Free-cell selection is defined over a row-major free list** (y outer, x
   inner), with one draw mapped as `free[floor(next() * free.length)]`. That
   order is part of the module's contract rather than an implementation detail —
   it is what makes a seeded spawn predictable: draw `0` is the first free cell,
   `0.999…` the last.
-- **The tick phase order is a contract**: boost countdown → queue head → wall
-  check → eat test, tail drop, self check → new snake → boost pickup → boost
-  TTL → apple respawn (draw 1) → boost roll (draw 2) and its cell (draw 3). Two
-  of those orderings carry meaning: pickup before TTL makes a boost pickable on
-  the last tick of its life, and TTL before respawn frees an expiring boost's
-  cell for the new apple. Tests script the RNG draws in that order and the stub
-  throws when the engine asks for one more, so a reordering fails loudly.
+- **The tick phase order is a contract**: queue head → wall check → eat test,
+  tail drop, self check → boost countdown → new snake → boost pickup → boost
+  TTL → apple respawn (draw 1) → boost roll (draw 2) and its cell (draw 3).
+  Three of those orderings carry meaning: the countdown sits after both
+  collision checks because a death tick changes no counter (above), pickup
+  before TTL makes a boost pickable on the last tick of its life, and TTL before
+  respawn frees an expiring boost's cell for the new apple. Tests script the RNG
+  draws in that order and the stub throws when the engine asks for one more, so
+  a reordering fails loudly.
 
 ## Consequences
 

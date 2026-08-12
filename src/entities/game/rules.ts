@@ -1,5 +1,8 @@
-// Every gameplay number in the game, named exactly once (CLAUDE.md invariant,
-// spec §3). No other production file may hold a gameplay literal.
+// Every gameplay constant in the game — the numbers of spec §3 plus the
+// starting direction — named exactly once (CLAUDE.md invariant). No other
+// production file may hold a gameplay literal.
+
+import type { Direction } from './types';
 
 /**
  * Landscape board: 24 columns x 16 rows (spec §3, as amended 2026-08-13).
@@ -37,6 +40,12 @@ const BOOST_SCORE = 5;
 
 const INITIAL_SNAKE_LENGTH = 3;
 
+/**
+ * The snake heads right out of the gate (spec §3) — the other half of the same
+ * spec sentence as INITIAL_SNAKE_LENGTH, so it lives in the same file.
+ */
+const INITIAL_DIRECTION: Direction = 'right';
+
 /** Two quick turns between ticks are both honored (spec §3). */
 const DIRECTION_QUEUE_DEPTH = 2;
 
@@ -62,6 +71,7 @@ export interface Rules {
   readonly foodScore: number;
   readonly boostScore: number;
   readonly initialSnakeLength: number;
+  readonly initialDirection: Direction;
   readonly directionQueueDepth: number;
 }
 
@@ -76,5 +86,6 @@ export const DEFAULT_RULES: Rules = {
   foodScore: FOOD_SCORE,
   boostScore: BOOST_SCORE,
   initialSnakeLength: INITIAL_SNAKE_LENGTH,
+  initialDirection: INITIAL_DIRECTION,
   directionQueueDepth: DIRECTION_QUEUE_DEPTH,
 };

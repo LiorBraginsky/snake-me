@@ -42,6 +42,7 @@ describe('board geometry', () => {
     expect(isOnBoard({ x: 23, y: 15 }, DEFAULT_RULES)).toBe(true);
     expect(isOnBoard({ x: -1, y: 0 }, DEFAULT_RULES)).toBe(false);
     expect(isOnBoard({ x: 24, y: 0 }, DEFAULT_RULES)).toBe(false);
+    expect(isOnBoard({ x: 0, y: -1 }, DEFAULT_RULES)).toBe(false);
     expect(isOnBoard({ x: 0, y: 16 }, DEFAULT_RULES)).toBe(false);
   });
 
