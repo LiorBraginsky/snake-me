@@ -14,9 +14,10 @@ export default defineConfig({
   // board; the chase's own deadline (30 s) sits inside this.
   timeout: 60_000,
   forbidOnly: !!process.env.CI,
-  // Deliberately 0. The chase is designed so it cannot lose the round before
-  // it scores (see e2e/smoke.spec.ts); a retry would hide exactly the
-  // nondeterminism that design claims to have removed.
+  // Deliberately 0. The chase has a real, if rare (~5%), residual
+  // wall-exposure timing window (see e2e/smoke.spec.ts); a retry would
+  // convert that real residual failure mode into a quietly green run instead
+  // of evidence.
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: { baseURL: BASE_URL, trace: 'retain-on-failure' },

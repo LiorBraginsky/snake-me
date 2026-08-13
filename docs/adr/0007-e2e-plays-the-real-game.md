@@ -77,8 +77,10 @@ argument is recorded in the spec's header rather than trusted to luck:
 - `score > 0` can only mean the apple was eaten — a boost is drawn only inside
   the eat-food branch, so none can exist beforehand.
 
-**`retries: 0`, stated with a comment in `playwright.config.ts`.** A retry would
-hide exactly the nondeterminism the argument above claims to have removed.
+**`retries: 0`, stated with a comment in `playwright.config.ts`.** The argument
+above does not claim the chase cannot fail — it names a real, if rare (~5%),
+residual wall-exposure timing window. A retry would convert that real residual
+failure mode into a quietly green run instead of evidence.
 
 **Two riders travel in the same round, because a second `test()` would only
 re-randomise the apple for zero extra coverage:**
@@ -135,11 +137,13 @@ silently moves to 4174 and Playwright waits on 4173 until it times out.
 - **Cost — beyond `data-theme` existing, theming correctness is still the demo
   gate's job.** No screenshot comparison, no computed-style assertion; six
   themes rendering correctly remains a human check.
-- **The round's path is random; its outcome is not.** A genuine flake therefore
-  shows up as a red CI run rather than as a quietly retried green one. The
-  chase carries its own 30 s deadline inside the 60 s test timeout, with a
-  message (`steered toward the apple but the score never grew`) that says which
-  half broke.
+- **`retries: 0` keeps a real, if rare, failure visible.** The chase's own
+  residual ~5% wall-exposure timing window (see Decision) is a genuine failure
+  mode, not a design flaw; a retry would convert it into a quietly green run
+  instead of evidence it happened, so a flake shows up as a red CI run rather
+  than as a quietly retried green one. The chase carries its own 30 s deadline
+  inside the 60 s test timeout, with a message (`steered toward the apple but
+  the score never grew`) that says which half broke.
 - **`@playwright/test` is a devDependency and browsers are not in the pnpm
   store.** `ci.yml`'s `verify` job gained
   `pnpm exec playwright install --with-deps chromium` before `pnpm test:e2e`;
@@ -187,9 +191,10 @@ silently moves to 4174 and Playwright waits on 4173 until it times out.
   run in about a second less. Rejected: the deploy story is base-path-dependent
   (`base: '/snake-me/'`), and the e2e should exercise the artifact Pages
   actually serves, including its base path and its production bundle.
-- **`retries: 1`** — the usual insurance against browser flake. Rejected: this
-  spec's whole design claim is that the round cannot fail by chance, so a retry
-  would convert a falsified claim into a green run and delete the evidence.
+- **`retries: 1`** — the usual insurance against browser flake. Rejected: the
+  chase has a real, if rare (~5%), residual wall-exposure timing window (see
+  Decision); a retry would convert that real residual failure mode into a
+  quietly green run instead of evidence.
 
 ## References
 

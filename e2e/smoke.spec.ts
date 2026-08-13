@@ -166,6 +166,21 @@ test('start, move, and grow the score in a real round', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'snake-me' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-theme', /\S+/);
 
+  // Assert the data-direction contract ONCE, here, before the chase starts.
+  // readChaseState (below) treats an unexpected value as "element momentarily
+  // missing" and returns null rather than throwing — Playwright's poll
+  // matcher calls that callback outside its own try/catch, so a throw there
+  // would be an immediate, un-retried hard failure, which is too blunt for a
+  // transient mid-render gap. But that same leniency means a genuinely broken
+  // contract would just silently stop the chase from steering, and the test
+  // would fail 30 s later with "steered toward the apple but the score never
+  // grew" — blaming the wrong half. This assertion is what actually fails
+  // loud on the `data-direction` contract itself.
+  await expect(page.locator('.snake__face')).toHaveAttribute(
+    'data-direction',
+    /^(up|down|left|right)$/,
+  );
+
   const stage = page.locator('.stage');
   const head = page.locator('.snake__segment--head');
   const scoreValue = page.locator('.hud__score-value');

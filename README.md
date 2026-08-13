@@ -40,8 +40,8 @@ for a temporary speed-up worth extra points, or let it expire. Your best five
 scores and your chosen theme survive a reload. Every number behind those
 sentences — board size, tick interval, boost odds, duration and payout — is a
 named constant in [`src/entities/game/rules.ts`](src/entities/game/rules.ts) and
-appears nowhere else in production code — the only other copy is the golden test
-that pins it.
+appears nowhere else in production code. Tests name them freely — one golden test
+pins every value.
 
 ## Architecture
 
@@ -90,8 +90,8 @@ by passing numbers to a fake. Storage takes a *lazy* `WebStorage` provider
 instead, because reading the `localStorage` property itself throws when storage
 is blocked. A second lint rule bans `window`, `document`, `Date`, `setTimeout`,
 `localStorage` and nine more identifiers inside those slices, and it is written
-to survive a type-cast laundering attempt. The result: the whole test suite runs under Node
-with no jsdom and no fake timers.
+to survive a type-cast laundering attempt. The result: the whole test suite runs
+under Node with no jsdom and no fake timers.
 
 **A green gate is not evidence that the gate ran.**
 This repo's most useful habit. The boundaries rule shipped as a silent no-op
@@ -213,10 +213,10 @@ review found nine surviving mutants in — a snake that could pass through the t
 wall, an apple that could spawn under the snake — all killed and re-verified.
 Chunk 05 found five mutations of the theme-token emitter surviving all four
 gates, including one that voided the entire naming contract, and closed the hole
-with an executable test. Chunk 05's widening of the headless-globals rule was probed
-with a deliberate violation in both directions — a banned global inside a newly
-covered slice, and the same probe inside the slice deliberately left out — before
-it was believed.
+with an executable test. Chunk 05's widening of the headless-globals rule was
+probed with a deliberate violation in both directions — a banned global inside a
+newly covered slice, and the same probe inside the slice deliberately left out —
+before it was believed.
 
 ## Repo layout
 
@@ -228,7 +228,7 @@ src/
   entities/   game — the pure core
   shared/     input, storage
 e2e/          the one Playwright smoke
-test/         the cross-slice contract tests
+test/         the cross-slice contract test, plus the toolchain pin
 docs/
   architecture.md   the living map
   adr/              frozen decisions
