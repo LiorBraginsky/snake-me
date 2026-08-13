@@ -6,10 +6,6 @@ import type { GameSession, GameSessionOptions } from './createGameSession';
 import { DEFAULT_RULES, createInitialState } from '../../entities/game';
 import type { GameState, Rng, Rules } from '../../entities/game';
 
-// `solid-js` maps the `node` export condition to dist/server.js, where
-// createEffect is `function createEffect(fn, value) {}` — a no-op. Under
-// `environment: 'node'` that build would make every reactive assertion below
-// vacuous. This test is the pin: it fails loudly if resolution ever slips.
 describe('reactive substrate', () => {
   it('re-runs an effect when a signal is written', () => {
     const runs: number[] = [];
@@ -29,10 +25,8 @@ describe('reactive substrate', () => {
   });
 });
 
-/** A 5x5 board keeps spawn and wall arithmetic checkable by hand, as in engine.test.ts. */
 const TINY: Rules = { ...DEFAULT_RULES, cols: 5, rows: 5 };
 
-/** Scripted draws, then throws — an unexpected extra draw is a failure, not a shrug. */
 function stubRng(values: readonly number[]): Rng {
   let index = 0;
 
@@ -49,11 +43,6 @@ function stubRng(values: readonly number[]): Rng {
   };
 }
 
-/**
- * Every session test is reactive, so it must be built inside a root — but the
- * root callback is one batch: writes queue and effects do not flush until it
- * returns. Acting and asserting happens outside, against the returned value.
- */
 function withRoot<T>(build: () => T): { value: T; dispose: () => void } {
   let dispose = (): void => {};
   const value = createRoot((disposeRoot) => {
@@ -74,10 +63,6 @@ function buildSession(options: GameSessionOptions): {
   return { session: value, dispose };
 }
 
-/**
- * Same as `buildSession`, plus an effect that records every state the signal
- * notifies — the only way to observe "nobody was notified" from outside.
- */
 function buildTrackedSession(options: GameSessionOptions): {
   session: GameSession;
   runs: GameState[];
@@ -211,10 +196,8 @@ describe('createGameSession', () => {
   it('confirm on a game-over state restarts a fresh running round', () => {
     const { session, dispose } = buildSession({ rules: TINY, rng: stubRng([0, 0]) });
 
-    session.dispatch({ kind: 'confirm' }); // idle -> running
+    session.dispatch({ kind: 'confirm' });
 
-    // Three ticks along the default heading walk the head off a 5-wide board:
-    // (2,2) -> (3,2) -> (4,2) -> off-board at x = 5.
     session.tick();
     session.tick();
     session.tick();
@@ -260,8 +243,6 @@ describe('createGameSession', () => {
     session.tick();
     session.tick();
 
-    // Two ticks along the default heading walk the head off (2,2), and the
-    // state object with it — this is the "dirtied" state restart() must undo.
     const dirtied = session.state();
     expect(dirtied.snake[0]).toEqual({ x: 4, y: 2 });
 
@@ -279,10 +260,10 @@ describe('createGameSession', () => {
   it('notifies on real transitions only — three effect runs across two no-ops', () => {
     const { session, runs, dispose } = buildTrackedSession({ rules: TINY, rng: stubRng([0]) });
 
-    session.dispatch({ kind: 'confirm' }); // idle -> running: notifies
-    session.dispatch({ kind: 'confirm' }); // already running: no-op
-    session.dispatch({ kind: 'turn', direction: 'left' }); // 180°: no-op
-    session.tick(); // real tick: notifies
+    session.dispatch({ kind: 'confirm' });
+    session.dispatch({ kind: 'confirm' });
+    session.dispatch({ kind: 'turn', direction: 'left' });
+    session.tick();
 
     expect(runs).toHaveLength(3);
     expect(runs[0]?.status).toBe('idle');

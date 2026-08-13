@@ -10,10 +10,6 @@ export interface HudProps {
   readonly boostTicksRemaining: number;
 }
 
-/**
- * Three scalars, not the whole GameState: the HUD is the game's text surface, so
- * it stays the accessible half of a stage whose layers are aria-hidden.
- */
 export function Hud(props: HudProps): JSX.Element {
   return (
     <div class="hud">

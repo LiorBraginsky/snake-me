@@ -10,12 +10,6 @@ export interface ThemePickerProps {
   readonly onSelect: (id: ThemeId) => void;
 }
 
-/**
- * Enumerates the registry rather than a hand-written list, so registry and UI
- * cannot drift apart (ADR 0003). Six independent buttons with plain tab stops:
- * no roving tabindex, so arrows keep steering the snake while a swatch has
- * focus.
- */
 export function ThemePicker(props: ThemePickerProps): JSX.Element {
   return (
     <div class="theme-picker" role="group" aria-label="Theme">

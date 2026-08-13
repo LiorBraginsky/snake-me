@@ -2,12 +2,6 @@ import type { Theme, ThemeId } from './types';
 
 export const DEFAULT_THEME_ID: ThemeId = 'dark-checker';
 
-/**
- * `dark-checker`'s values are the ones chunk 04 shipped as the `:root` defaults
- * in `app/styles/tokens.css` — the same 14 names, the same 14 values. A solid
- * theme still declares a coherent cell pair: `boardStyle` is data, so flipping
- * it must never require a colour edit.
- */
 const THEMES: Readonly<Record<ThemeId, Theme>> = {
   'dark-checker': {
     id: 'dark-checker',
@@ -137,11 +131,6 @@ const THEMES: Readonly<Record<ThemeId, Theme>> = {
   },
 };
 
-/**
- * Picker order = declaration order. Derived from the registry rather than
- * restated, so a theme cannot exist and go unlisted (ADR 0003: registry and UI
- * cannot drift apart).
- */
 export const THEME_LIST: readonly Theme[] = Object.values(THEMES);
 
 export function themeById(id: ThemeId): Theme {

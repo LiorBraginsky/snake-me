@@ -13,11 +13,6 @@ const LABELS: Readonly<Record<StatusBadgeVariant, string>> = {
 
 export interface StatusBadgeProps {
   readonly status: GameStatus;
-  /**
-   * Ticks the speed multiplier still applies for. Shown as a label, never as a
-   * countdown: formatting seconds would restate a gameplay number outside
-   * `entities/game/rules.ts`.
-   */
   readonly boostTicksRemaining: number;
 }
 

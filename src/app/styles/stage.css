@@ -1,24 +1,18 @@
 @layer layout {
   .stage {
     position: relative;
-    /* The query container --cell-size is measured against. An element cannot
-       query itself, so NOTHING in this rule may use --cell-size. */
     container-type: inline-size;
     inline-size: 100%;
     aspect-ratio: var(--board-cols) / var(--board-rows);
     overflow: hidden;
     border-radius: 0.5rem;
     background-color: var(--board-bg);
-    /* The wall (spec §5). Drawn outside the layout box, so cell maths stays
-       exact and a bottom-row segment's shadow is clipped at the wall. */
     box-shadow: 0 0 0 var(--board-wall-width) var(--board-border);
   }
 
   .stage__layer {
     position: absolute;
     inset: 0;
-    /* One cell's side, derived from the board's own inline size: no JS measures
-       anything, no ResizeObserver, no --cell-size write from TypeScript. */
     --cell-size: calc(100cqi / var(--board-cols));
     --segment-gap: calc(var(--cell-size) * 0.11);
     --segment-radius: calc(var(--cell-size) * 0.24);
@@ -29,8 +23,6 @@
     z-index: 0;
   }
 
-  /* Checkerboard without a single cell element: one gradient tile covering 2x2
-     cells. Which corner takes cell-a is cosmetic. */
   .stage__layer--board[data-board-style='checker'] {
     background-color: var(--board-cell-a);
     background-image: repeating-conic-gradient(
@@ -46,15 +38,9 @@
 
   .stage__layer--entities {
     z-index: 1;
-    /* Promotes the moving half of the stage to its own compositor layer, so a
-       tick repaints this transparent texture and never the board's (spec §5,
-       ADR 0001, chunk 04 DoD). The only will-change in the tree, and it is
-       load-bearing rather than a micro-optimisation. */
     will-change: transform;
   }
 
-  /* Overlays only ever appear while the loop is stopped (idle / game-over), so
-     their backdrop filter never competes with a tick. */
   .stage__overlay {
     position: absolute;
     inset: 0;
@@ -109,17 +95,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* 0.75, not the more obvious 0.72: at 0.72 `nokia`'s rank/date still land at
-     4.321:1 against `--hud-bg`, under WCAG 1.4.3's 4.5:1 for 13px text. 0.75
-     clears all six themes, worst case `nokia` at 4.64:1 (chunk 05 fix round).
-     This is a deliberate single global value, not six per-theme overrides,
-     chosen even though it also raises three themes that already cleared 4.5:1
-     at the old 0.6 (dark-checker 6.229:1, dark-solid 6.043:1, neon 5.737:1).
-     One number beating six per-theme overrides is the better trade-off, but
-     naming it here matters: `hud.css`'s `.hud__chip` comment invokes "don't
-     silently change an already-passing theme" to rule out a candidate fix,
-     and that criterion has to be stated once and applied consistently rather
-     than cited only when it argues against a change. */
   .overlay-panel__score-rank,
   .overlay-panel__score-date {
     opacity: 0.75;

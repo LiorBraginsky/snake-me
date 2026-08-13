@@ -1,21 +1,5 @@
 import type { Theme, ThemeTokens } from './types';
 
-/**
- * The only bridge from TypeScript to paint (ADR 0003). It writes the 14 theme
- * tokens and `data-theme`, and NOTHING else — never a geometry property, which
- * would put a layout number in `themes.ts` (CLAUDE.md).
- *
- * The target is `document.documentElement` (`:root`), never a mount node: `body`
- * paints `background-color: var(--hud-bg)` and inherits nothing from a
- * descendant, so writing lower would leave the page background stuck on the
- * `dark-checker` default while the board and HUD switched (docs/architecture.md
- * § CSS custom property contract). An inline style outranks every `@layer`,
- * which is why `tokens.css` can keep the defaults and `theme.css` carries no
- * tokens.
- *
- * `features/theming` is deliberately outside `eslint.config.js`'s
- * `no-restricted-globals` glob for exactly this function (ADR 0005).
- */
 export function applyTheme(theme: Theme): void {
   const root = document.documentElement;
 
@@ -26,14 +10,6 @@ export function applyTheme(theme: Theme): void {
   root.setAttribute('data-theme', theme.id);
 }
 
-/**
- * camelCase -> `--kebab-case`, with no lookup table: the property name IS the
- * field name, which is what keeps the frozen contract mechanical.
- *
- * Exported slice-internally so `applyTheme.test.ts` can exercise the transform
- * without a DOM — it is NOT re-exported from `index.ts`; the public API is
- * `applyTheme` only.
- */
 export function themeCustomProperties(tokens: ThemeTokens): Readonly<Record<string, string>> {
   const properties: Record<string, string> = {};
 

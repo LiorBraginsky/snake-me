@@ -18,9 +18,6 @@
     letter-spacing: 0.08em;
   }
 
-  /* The HUD and the board share this width, so the board's aspect ratio drives
-     the whole column. --board-cols / --board-rows arrive inline from App
-     (DEFAULT_RULES); there is no CSS fallback on purpose. */
   .app__game {
     display: flex;
     flex-direction: column;

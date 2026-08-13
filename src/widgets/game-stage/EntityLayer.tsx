@@ -13,9 +13,6 @@ export interface EntityLayerProps {
 }
 
 /**
- * z1: everything that moves, on its own compositor layer (see
- * `.stage__layer--entities` in stage.css).
- *
  * Each item goes through a NON-keyed <Show> rather than one <For> over
  * [food, boost]: the engine rebuilds the boost object on every tick to
  * decrement `ttlTicks`, so a reference-keyed <For> would tear the bolt's SVG

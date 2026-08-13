@@ -8,16 +8,9 @@ type SegmentRole = 'head' | 'body' | 'tail';
 export interface SnakeSegmentProps {
   readonly at: Point;
   readonly role: SegmentRole;
-  /** Head only: which way the face points. */
   readonly direction?: Direction;
 }
 
-/**
- * One cell-sized box, placed by transform alone. For an interior segment `at` is
- * a plain value handed over by <For>, so these two custom properties are written
- * once at creation and never again: the engine keeps every surviving segment's
- * Point object identity across a tick.
- */
 export function SnakeSegment(props: SnakeSegmentProps): JSX.Element {
   return (
     <div

@@ -28,9 +28,6 @@
     outline-offset: 2px;
   }
 
-  /* Board / snake / item, in that order. The three --swatch-* properties are
-     the picker's own namespace — set inline per swatch, disjoint from the 14
-     theme tokens and from chunk 04's geometry names. */
   .theme-swatch__preview {
     inline-size: 1.1rem;
     block-size: 1.1rem;

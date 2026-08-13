@@ -5,23 +5,12 @@ export type ControlSignal =
   | { readonly kind: 'togglePause' }
   | { readonly kind: 'confirm' };
 
-/**
- * The subset of `KeyboardEvent` the adapter reads. There is no `KeyboardEvent`
- * constructor in node, so a test could not build a real one — declaring only
- * the members this adapter uses lets a test emit a plain object with no cast.
- */
 export interface KeyDownEvent {
   readonly key: string;
   readonly repeat: boolean;
   preventDefault(): void;
 }
 
-/**
- * The subset of `EventTarget` the adapter needs. `window` does not exist in
- * node, so reaching for it directly would make this module untestable
- * without jsdom — which `docs/architecture.md` bans permanently. A port keeps
- * production wiring at `window` while tests pass a fake.
- */
 export interface KeyDownTarget {
   addEventListener(type: 'keydown', listener: (event: KeyDownEvent) => void): void;
   removeEventListener(type: 'keydown', listener: (event: KeyDownEvent) => void): void;
@@ -58,8 +47,6 @@ export function createKeyboardControls(
     // calling stopPropagation() (see ThemeSwatch; ADR 0005 § Amendment).
     event.preventDefault();
 
-    // Claimed first, suppressed second: holding an arrow must still not scroll,
-    // but a held key must not strobe pause or re-restart a finished round.
     if (event.repeat) {
       return;
     }

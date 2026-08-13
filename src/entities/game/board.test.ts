@@ -5,13 +5,8 @@ import type { Rng } from './rng';
 import { DEFAULT_RULES } from './rules';
 import type { Rules } from './rules';
 
-/** A 3x3 board keeps the free-cell arithmetic checkable by hand. */
 const TINY: Rules = { ...DEFAULT_RULES, cols: 3, rows: 3 };
 
-/**
- * Returns the scripted draws, then throws. Throwing is the point: a test that
- * scripts N draws also asserts the code under test makes exactly N.
- */
 function stubRng(values: readonly number[]): Rng & { calls: () => number } {
   let index = 0;
 
@@ -80,7 +75,6 @@ describe('freeCells', () => {
 
 describe('pickFreeCell', () => {
   it('maps one draw onto the row-major free list', () => {
-    // 8 free cells, floor(0.5 * 8) = 4 -> the fifth of them.
     expect(pickFreeCell(TINY, [{ x: 0, y: 0 }], stubRng([0.5]))).toEqual({ x: 2, y: 1 });
   });
 
