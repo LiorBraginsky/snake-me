@@ -5,4 +5,7 @@
 @import './reset.css';
 @import './tokens.css';
 @import './layout.css';
+@import './stage.css';
+@import './entities.css';
+@import './hud.css';
 @import './theme.css';

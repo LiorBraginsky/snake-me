@@ -1,13 +1,51 @@
 @layer tokens {
   :root {
+    /* ── Theme tokens ───────────────────────────────────────────────────────
+       The 14 fields of `ThemeTokens` (spec §6 / ADR 0003), one custom property
+       each, named as the EXACT kebab-case of the field: boardBg -> --board-bg,
+       hudAccent -> --hud-accent. Values below are the `dark-checker` default.
+       Chunk 05's applyTheme writes these same 14 names inline on the game root,
+       and an inline style outranks every @layer — which is why the defaults
+       belong here in the tokens layer and theme.css can stay empty.
+       DO NOT RENAME: nothing type-checks these strings against themes.ts. */
+    --board-bg: #131820;
+    --board-cell-a: #1b2230;
+    --board-cell-b: #172029;
+    --board-border: #2f3b4d;
+
+    --snake-head: #8ce563;
+    --snake-body: #4faa4a;
+    --snake-tail: #3c8340;
+    --snake-shadow: #24512b;
+
+    /* apple body; also the snake's tongue (no separate tongue token exists) */
+    --item-food: #e04b4b;
+    /* apple stem + leaf */
+    --item-food-accent: #57cc99;
+    --item-boost: #ffd166;
+
+    --hud-bg: #10151c;
+    --hud-text: #e7eef5;
+    --hud-accent: #8ce563;
+
+    /* ── Geometry — NOT theme tokens ────────────────────────────────────────
+       Chunk 04 owns these names; a theme must never write them. The board
+       dimensions are absent on purpose: --board-cols / --board-rows arrive as
+       an inline style from DEFAULT_RULES (App and GameStage), because gameplay
+       numbers live in entities/game/rules.ts and nowhere else. A missing
+       inline style therefore collapses the board visibly instead of quietly
+       rendering someone's stale copy of 24x16. */
     --app-font: system-ui, sans-serif;
     --app-gap: 1rem;
-
-    /* Board dimensions (spec §3). Chunk 04 must derive these from the named
-       constants in entities/game/rules.ts instead of restating them here —
-       this is a single named place to duplicate against until that slice
-       exists. */
-    --board-cols: 24;
-    --board-rows: 16;
+    /* Vertical space the title, HUD and gaps take off the viewport before the
+       board gets what is left. */
+    --app-chrome-block-size: 10rem;
+    --stage-max-inline-size: 60rem;
+    /* The wall: a ring drawn OUTSIDE the stage's layout box (box-shadow, not
+       border), so the board's content box stays exactly cols x rows square
+       cells. A fixed length, not a cell fraction — `.stage` is the container
+       query container and an element cannot query itself, so --cell-size is
+       unavailable in the `.stage` rule. */
+    --board-wall-width: 2px;
   }
 }

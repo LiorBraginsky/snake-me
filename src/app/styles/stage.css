@@ -1,0 +1,116 @@
+@layer layout {
+  .stage {
+    position: relative;
+    /* The query container --cell-size is measured against. An element cannot
+       query itself, so NOTHING in this rule may use --cell-size. */
+    container-type: inline-size;
+    inline-size: 100%;
+    aspect-ratio: var(--board-cols) / var(--board-rows);
+    overflow: hidden;
+    border-radius: 0.5rem;
+    background-color: var(--board-bg);
+    /* The wall (spec §5). Drawn outside the layout box, so cell maths stays
+       exact and a bottom-row segment's shadow is clipped at the wall. */
+    box-shadow: 0 0 0 var(--board-wall-width) var(--board-border);
+  }
+
+  .stage__layer {
+    position: absolute;
+    inset: 0;
+    /* One cell's side, derived from the board's own inline size: no JS measures
+       anything, no ResizeObserver, no --cell-size write from TypeScript. */
+    --cell-size: calc(100cqi / var(--board-cols));
+    --segment-gap: calc(var(--cell-size) * 0.11);
+    --segment-radius: calc(var(--cell-size) * 0.24);
+    --snake-shadow-depth: calc(var(--cell-size) * 0.14);
+  }
+
+  .stage__layer--board {
+    z-index: 0;
+  }
+
+  /* Checkerboard without a single cell element: one gradient tile covering 2x2
+     cells. Which corner takes cell-a is cosmetic. */
+  .stage__layer--board[data-board-style='checker'] {
+    background-color: var(--board-cell-a);
+    background-image: repeating-conic-gradient(
+      var(--board-cell-b) 0% 25%,
+      var(--board-cell-a) 0% 50%
+    );
+    background-size: calc(var(--cell-size) * 2) calc(var(--cell-size) * 2);
+  }
+
+  .stage__layer--board[data-board-style='solid'] {
+    background-color: var(--board-bg);
+  }
+
+  .stage__layer--entities {
+    z-index: 1;
+    /* Promotes the moving half of the stage to its own compositor layer, so a
+       tick repaints this transparent texture and never the board's (spec §5,
+       ADR 0001, chunk 04 DoD). The only will-change in the tree, and it is
+       load-bearing rather than a micro-optimisation. */
+    will-change: transform;
+  }
+
+  /* Overlays only ever appear while the loop is stopped (idle / game-over), so
+     their backdrop filter never competes with a tick. */
+  .stage__overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    padding: var(--app-gap);
+    background-color: color-mix(in oklab, var(--board-bg) 82%, transparent);
+    backdrop-filter: blur(2px);
+  }
+
+  .overlay-panel {
+    display: grid;
+    justify-items: center;
+    gap: 0.75rem;
+    padding: 1.25rem 1.75rem;
+    border-radius: 0.75rem;
+    background-color: var(--hud-bg);
+    color: var(--hud-text);
+    text-align: center;
+    box-shadow: 0 0.5rem 1.5rem color-mix(in oklab, #000 45%, transparent);
+  }
+
+  .overlay-panel__title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .overlay-panel__score {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--hud-accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .overlay-panel__hint {
+    margin: 0;
+    font-size: 0.8125rem;
+    opacity: 0.75;
+  }
+
+  .overlay-panel__button {
+    padding: 0.5rem 1.25rem;
+    border: 0;
+    border-radius: 999px;
+    background-color: var(--hud-accent);
+    color: var(--hud-bg);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .overlay-panel__button:focus-visible {
+    outline: 2px solid var(--hud-text);
+    outline-offset: 2px;
+  }
+}
