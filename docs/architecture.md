@@ -2,20 +2,25 @@
 
 **Living document.** It describes what exists *now* plus where the not-yet-built
 parts will go. Every chunk that adds or fills a slice updates the inventory
-below in the same PR; chunk 06 does the final sync.
+below in the same PR; chunk 06 did the final sync.
 
 Frozen reasoning lives in `docs/adr/`. Gameplay and visual truth live in
 `docs/specs/2026-08-12-snake-game-design.md`. This file is the map, not the
 territory and not the argument.
 
-- **Last synced:** chunk 05 — theming + storage
-- **State of the tree:** every slice in the inventory below is `live`. `app/`
-  composes the session, the loop, the keyboard adapter, the theme state and the
-  scoreboard state, and owns the CSS cascade. The theme is applied to `:root`
-  from `App` before the first paint; the player can switch among six themes
-  through `widgets/theme-picker`, and the pick and the top-5 scoreboard both
-  persist across a reload through `shared/storage`'s `KeyValueStore`.
-  `features/scoreboard` is a new slice this chunk added.
+- **Last synced:** chunk 06 — e2e smoke, README, closeout
+- **State of the tree:** the game is feature-complete and every slice in the
+  inventory below is `live`. `app/` composes the session, the loop, the keyboard
+  adapter, the theme state and the scoreboard state, and owns the CSS cascade.
+  The theme is applied to `:root` from `App` before the first paint; the player
+  can switch among six themes through `widgets/theme-picker`, and the pick and
+  the top-5 scoreboard both persist across a reload through `shared/storage`'s
+  `KeyValueStore`. `features/scoreboard` was the last slice added (chunk 05).
+  Chunk 06 added no slice and changed no file under `src/`: it turned
+  `pnpm test:e2e` from a stub script into one real Chromium round
+  (`e2e/smoke.spec.ts`) and gave the repo a `README.md`, which is the only
+  public record of how it was built — the chunk contracts, plans and
+  orchestration substrate under `.claude/` are untracked.
 
 ## Layers
 
@@ -235,6 +240,12 @@ Structure that is data rather than colour travels as attributes:
 `data-board-style` (`checker` \| `solid` — ADR 0003's board branch) and
 `data-direction` on the head's face.
 
+`--x`, `--y`, `--board-cols` / `--board-rows` and `data-direction` are also the
+e2e's read surface: chunk 06's smoke steers by reading them off the DOM instead
+of seeding the game, which is what keeps a seed seam out of production
+([ADR 0007](adr/0007-e2e-plays-the-real-game.md)). Renaming one of them now
+fails `pnpm test:e2e`, deliberately.
+
 **Trap — an element cannot query itself.** `.stage` establishes the container
 `--cell-size` is measured against, so no declaration *on `.stage`* may use
 `--cell-size`; a `100cqi` there would resolve against the viewport instead. That
@@ -274,7 +285,9 @@ Three mechanisms, in the order they stop work happening (spec §5, ADR 0001):
    attribute, and it changes only when the player picks a theme through
    `ThemePicker`, never on a tick. The checkerboard is still one gradient
    element rather than 384 nodes; the invariant survives chunk 05 even though
-   `BoardLayer` is no longer literally propless.
+   `BoardLayer` is no longer literally propless. As of chunk 06 this mechanism
+   is asserted, not only reasoned: `pnpm test:e2e` counts zero mutation records
+   on `.stage__layer--board` across a live round (Enforcement row below).
 2. The engine keeps every surviving segment's `Point` object identity across a
    tick, so a reference-keyed `<For>` over `snake.slice(1, -1)` inserts one row
    and removes one row; the interior rows are never touched. Head and tail are
@@ -286,7 +299,10 @@ Three mechanisms, in the order they stop work happening (spec §5, ADR 0001):
    `transform` itself is a static `calc()` in `entities.css` and is never
    rewritten from script — only its two inputs are. `<Index>` would be wrong
    here, and both items go through a non-keyed `<Show>` because the engine
-   rebuilds the boost object every tick to decrement `ttlTicks`.
+   rebuilds the boost object every tick to decrement `ttlTicks`. The DOM half
+   of this is asserted too: the same e2e round holds a reference to the head
+   element across the round and compares it by identity at the end, so a
+   rebuilt node instead of a coordinate rewrite fails the gate.
 3. Movement only ever writes the two coordinate custom properties (`--x`,
    `--y`); the `transform` that turns them into a pixel offset is declared once
    in CSS and never touched from script. `.stage__layer--entities` carries
@@ -294,6 +310,13 @@ Three mechanisms, in the order they stop work happening (spec §5, ADR 0001):
    compositor layer. That is the one `will-change` in the tree and it is
    load-bearing. Verified, not asserted: DevTools → Rendering → Paint flashing
    during a live round, per the chunk 04 demo criterion.
+
+The e2e's zero-mutation assertion proves script never invalidates the board —
+Solid never re-renders it and no tick rewrites its one dynamic attribute. It
+proves nothing about the compositor: `will-change` is a hint, promotion is the
+browser's decision, and no automated check in this repo observes paint. Paint
+verification stays the manual DevTools "Paint flashing" pass from the chunk 04
+demo criterion, and that is a deliberate stopping point, not an omission.
 
 Compositor promotion is the browser's decision, not this codebase's —
 `will-change` is a hint, not a guarantee. If paint flashing ever shows the
@@ -341,11 +364,12 @@ it stops being a rule.
 | Every file under `src/` belongs to a slice | `pnpm lint` | `boundaries/no-unknown-files: "error"` — a `.ts` / `.tsx` file matching no `boundaries/elements` pattern is an error in its own right, not merely unimportable |
 | Solid reactivity / JSX correctness | `pnpm lint` | `eslint-plugin-solid` `flat/typescript` preset — its reactivity rules ship as `warn`, so `--max-warnings=0` is what turns them into a failure |
 | Theme token completeness | `pnpm typecheck` | `ThemeTokens` is a closed required record |
-| The 14-name emit contract (`applyTheme.ts`'s camelCase -> `--kebab-case` transform) | `pnpm test` | Split across two files by layer, not by assertion type. `features/theming/applyTheme.test.ts` (chunk 05 fix round) asserts the transform emits exactly the 14 frozen property names for a sample `ThemeTokens`, and that every registered theme's 14 values survive the transform unchanged. `test/theme-token-contract.test.ts` (chunk 05 second fix round) cross-checks, via `readFileSync` on `app/styles/tokens.css` — not an import — that all 14 names are declared on its `:root`; it sits in `test/` rather than the slice because that check spans `features/theming` and `app`, and `app` is not a sibling the slice test's boundaries carve-out covers. Review-enforced before either row landed, now gate-enforced on the emit side; the CSS side is checked as a subset, not proven exhaustive. `applyTheme`'s DOM effects (writing `document.documentElement`, calling `setAttribute`, and the `data-theme` value itself) stay outside `pnpm test` — no jsdom, per spec §8 — and are carried by the demo gate |
+| The 14-name emit contract (`applyTheme.ts`'s camelCase -> `--kebab-case` transform) | `pnpm test` | Split across two files by layer, not by assertion type. `features/theming/applyTheme.test.ts` (chunk 05 fix round) asserts the transform emits exactly the 14 frozen property names for a sample `ThemeTokens`, and that every registered theme's 14 values survive the transform unchanged. `test/theme-token-contract.test.ts` (chunk 05 second fix round) cross-checks, via `readFileSync` on `app/styles/tokens.css` — not an import — that all 14 names are declared on its `:root`; it sits in `test/` rather than the slice because that check spans `features/theming` and `app`, and `app` is not a sibling the slice test's boundaries carve-out covers. Review-enforced before either row landed, now gate-enforced on the emit side; the CSS side is checked as a subset, not proven exhaustive. `applyTheme`'s DOM effects (writing `document.documentElement`, calling `setAttribute`, and the `data-theme` value itself) stay outside `pnpm test` — no jsdom, per spec §8 — and are carried by the demo gate, plus, as of chunk 06, one `pnpm test:e2e` assertion that `<html>` carries a non-empty `data-theme` after boot: that gates the *fact* of the write, never the 14 values |
 | TS strict across the repo | `pnpm typecheck` | `tsc --noEmit`, `strict: true` |
 | Engine determinism (seeded RNG, golden tests) | `pnpm test` | vitest, environment `node` — and `node` is the **final** state, not a staging one: the project tests logic only (spec §8), so jsdom is never added |
-| Session, engine, scoreboard and `shared/**` are headless (no ambient DOM, clock, scheduling or randomness) | `pnpm lint` | Two rules, scoped as of chunk 05 to `src/entities/**`, `src/features/game-session/**`, `src/features/scoreboard/**` and `src/shared/**`, tests excluded. `no-restricted-globals` bans direct references to `window`, `document`, `localStorage`, `requestAnimationFrame`, `cancelAnimationFrame`, `performance`, `Date`, `setTimeout`, `setInterval`, `queueMicrotask`, `self`, `navigator`, `crypto` and `globalThis` — it flags every reference eslint-scope resolves to that identifier, so a type-cast wrapper (`(globalThis as unknown as { window: Window }).window`) does not launder it past the rule. `no-restricted-properties` separately bans the *property* `Math.random` — `Math.max` / `.floor` / `.round` / `.imul` stay legal — but only when `Math` is a bare identifier: a cast on `Math` itself (`(Math as unknown as { random(): number }).random()`) is NOT caught by either rule; no test in this codebase relies on that gap being closed. `features/theming` is deliberately out of scope ([ADR 0003](adr/0003-theme-model.md)): writing theme tokens onto `document` is that slice's job. `src/shared/**` joined the glob in chunk 05 **with no carve-out**: `shared/storage`'s `createWebStorageStore` takes the storage object as an injected provider (`() => window.localStorage`) rather than naming `localStorage` itself, so nothing under `shared/**` needs an ambient global; `features/scoreboard` joined for the same reason `game-session` is in the glob — the ISO date is an injected `now: () => string` ([ADR 0005 § Amendment](adr/0005-headless-session-ports.md)). The widened rule was re-proven with a deliberate violation before merge: a probe `localStorage.getItem(...)` in `shared/storage/keyValueStore.ts` produced `'localStorage' is restricted from being used. Headless by contract: take a port (ADR 0005)`, and the same probe pattern with `new Date().toISOString()` in `features/theming/applyTheme.ts` produced no `no-restricted-globals` error at all (only an unrelated unused-variable error) — proving both the rule's reach over `shared/**` and `features/theming`'s exclusion boundary in the same run |
-| Behaviour end to end | `pnpm test:e2e` | Playwright smoke — a stub script until chunk 06, already wired into CI so chunk 06 replaces a script body rather than the workflow |
+| Session, engine, scoreboard and `shared/**` are headless (no ambient DOM, clock, scheduling or randomness) | `pnpm lint` | Two rules, scoped as of chunk 05 to `src/entities/**`, `src/features/game-session/**`, `src/features/scoreboard/**` and `src/shared/**`, tests excluded. `no-restricted-globals` bans direct references to `window`, `document`, `localStorage`, `requestAnimationFrame`, `cancelAnimationFrame`, `performance`, `Date`, `setTimeout`, `setInterval`, `queueMicrotask`, `self`, `navigator`, `crypto` and `globalThis` — it flags every reference eslint-scope resolves to that identifier, so a type-cast wrapper (`(globalThis as unknown as { window: Window }).window`) does not launder it past the rule. `no-restricted-properties` separately bans the *property* `Math.random` — `Math.max` / `.floor` / `.round` / `.imul` stay legal — but only when `Math` is a bare identifier: a cast on `Math` itself (`(Math as unknown as { random(): number }).random()`) is NOT caught by either rule, and that is where the rule deliberately stops. Closing it means banning the bare `Math` identifier, which takes every legitimate call site in `entities/game` down with it, and the residual hole is acceptable because that cast is not a slip anyone commits by accident — it is laundering written on purpose to get past a rule the author knew was there. This gate exists to keep production determinism safe from accidents; deliberate laundering is a review problem, not a lint problem. `features/theming` is deliberately out of scope ([ADR 0003](adr/0003-theme-model.md)): writing theme tokens onto `document` is that slice's job. `src/shared/**` joined the glob in chunk 05 **with no carve-out**: `shared/storage`'s `createWebStorageStore` takes the storage object as an injected provider (`() => window.localStorage`) rather than naming `localStorage` itself, so nothing under `shared/**` needs an ambient global; `features/scoreboard` joined for the same reason `game-session` is in the glob — the ISO date is an injected `now: () => string` ([ADR 0005 § Amendment](adr/0005-headless-session-ports.md)). The widened rule was re-proven with a deliberate violation before merge: a probe `localStorage.getItem(...)` in `shared/storage/keyValueStore.ts` produced `'localStorage' is restricted from being used. Headless by contract: take a port (ADR 0005)`, and the same probe pattern with `new Date().toISOString()` in `features/theming/applyTheme.ts` produced no `no-restricted-globals` error at all (only an unrelated unused-variable error) — proving both the rule's reach over `shared/**` and `features/theming`'s exclusion boundary in the same run |
+| Behaviour end to end | `pnpm test:e2e` | `playwright test` — one Chromium project, one spec (`e2e/smoke.spec.ts`), one test: app loads → Start → the head leaves its starting cell → the score grows. It plays the real `createSeededRng(Date.now())` game rather than a seeded one and steers by reading `--x` / `--y` off the head and the apple plus `data-direction` off the head's face, so it restates no gameplay constant and production carries no seed param, no test hook and no `data-testid` ([ADR 0007](adr/0007-e2e-plays-the-real-game.md)). It also asserts `<html>` carries a non-empty `data-theme`. `webServer` runs `pnpm build && vite preview --port 4173 --strictPort` at Vite's `base`, so the round runs against the artifact Pages serves and a clean tree is green; `--strictPort` is load-bearing — without it Vite moves to 4174 and Playwright waits on 4173 until timeout. `retries: 0` on purpose: a retry would hide exactly the nondeterminism the chase design claims to have removed |
+| A tick never invalidates the board layer | `pnpm test:e2e` | Two `MutationObserver`s installed before Start, watching `attributes` + `childList` + `subtree` + `characterData`: zero records on `.stage__layer--board` for the whole round, non-zero on `.stage__layer--entities` as the positive control (a probe that sees nothing anywhere proves nothing), plus head-node identity across the round. Covers mechanism 1 and the DOM half of mechanism 2 in [§ Why a tick cannot repaint the board](#why-a-tick-cannot-repaint-the-board); the compositor half stays the manual paint-flashing check. Both counters were re-proven by deliberate violation before merge — aiming either observer at the other layer fails the run; the head-identity assertion is reasoned, not violation-proven |
 | Formatting | `pnpm lint` | `prettier --check .` |
 
 `pnpm lint` is `eslint . --max-warnings=0 && prettier --check .`. The flag is
@@ -403,6 +427,27 @@ the same file regardless of filesystem case-sensitivity. It shipped as
 `statusBadgeVariant.ts` — a slice-internal logic module cannot share a name with
 the case-variant of a component file colocated beside it, and `tsc`, not the
 filesystem, is what enforces that.
+
+### The e2e sits outside `src/`, and that is what exempts it
+
+`e2e/smoke.spec.ts` and `playwright.config.ts` live at the repo root, not under
+`src/`, so `boundaries/dependencies`, `boundaries/no-unknown-files` and the
+headless `no-restricted-globals` block — all three scoped to `src/**` — never
+see them. That is why the spec may name `window`, `document` and
+`MutationObserver` freely: it is the browser's side of the wire, not a slice.
+It is outside vitest's `include` (`vite.config.ts`), so `pnpm test` never runs
+it and the suite stays logic-only. It **is** inside `tsconfig.json`'s `include`,
+so `pnpm typecheck` covers it — one compiler, no second config to drift.
+Verified rather than assumed: a temporary `const x: number = 'oops';` in the
+spec made `pnpm typecheck` fail with `error TS2322`, then it was reverted.
+
+`eslint.config.js`'s `ignores` also lists `playwright-report/**` and
+`test-results/**`, for a reason worth stating because CI never exposes it:
+**ESLint does not read `.gitignore`.** Once a local `pnpm test:e2e` has created
+those directories, `eslint .` walks into their generated JS and
+`--max-warnings=0` fails on output nobody wrote. CI never hits it — lint runs
+before the e2e — so it would only ever bite a developer. `.prettierignore`
+carries the same two entries, belt and braces.
 
 ### Trap: four things make the boundaries gate real
 
@@ -480,6 +525,14 @@ verified by `ci.yml` or not at all. For the same reason `deploy.yml` has no
 Both workflows take Node from `node-version-file: .nvmrc`, not a hardcoded
 version, so CI and a local `nvm use` cannot drift apart.
 
+`verify` gained one step in chunk 06: `pnpm exec playwright install --with-deps
+chromium`, immediately before `pnpm test:e2e`, because browsers do not come from
+the pnpm store. The job name did not change and must not. The e2e's `webServer`
+runs `pnpm build` itself, so it rebuilds what the `pnpm build` step produced two
+lines earlier — kept deliberately: the build is a gate in its own right and has
+to fail on its own line, and one `webServer` command keeps local and CI on a
+single code path.
+
 Not yet executable — enforced by review, and promoted to a lint rule if the
 mistake recurs (`.claude/orchestration.md` § Harvest):
 
@@ -529,3 +582,4 @@ lint error, and the answer is to find the layer it belongs in.
 | [0004](adr/0004-engine-api.md) | Engine API: injected `Rules` and `Rng`, no-op transitions return their input, board-full ends the round | proposed |
 | [0005](adr/0005-headless-session-ports.md) | Headless session: time and input as ports the composition root supplies | proposed |
 | [0006](adr/0006-theme-carries-no-components.md) | Theme carries palette and board style, not components | proposed |
+| [0007](adr/0007-e2e-plays-the-real-game.md) | The e2e plays the real game: the test adapts, production grows no seed seam | proposed |
