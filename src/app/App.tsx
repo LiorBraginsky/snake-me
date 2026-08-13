@@ -5,6 +5,7 @@ import { DEFAULT_RULES, createSeededRng } from '../entities/game';
 import { createGameLoop, createGameSession } from '../features/game-session';
 import { createKeyboardControls } from '../shared/input';
 import { GameStage } from '../widgets/game-stage';
+import { Hud } from '../widgets/hud';
 
 export function App(): JSX.Element {
   // The composition root, and the only place ambient capability is read:
@@ -29,6 +30,11 @@ export function App(): JSX.Element {
         class="app__game"
         style={{ '--board-cols': DEFAULT_RULES.cols, '--board-rows': DEFAULT_RULES.rows }}
       >
+        <Hud
+          score={session.state().score}
+          status={session.state().status}
+          boostTicksRemaining={session.state().boostTicksRemaining}
+        />
         <GameStage
           cols={DEFAULT_RULES.cols}
           rows={DEFAULT_RULES.rows}

@@ -1,9 +1,12 @@
+import { Show } from 'solid-js';
 import type { JSX } from 'solid-js';
 
 import type { GameState } from '../../entities/game';
 import { BoardLayer } from './BoardLayer';
 import type { BoardStyle } from './BoardLayer';
 import { EntityLayer } from './EntityLayer';
+import { GameOverOverlay } from './GameOverOverlay';
+import { StartOverlay } from './StartOverlay';
 
 export interface GameStageProps {
   /** Board width in cells. The composition root passes `DEFAULT_RULES.cols`. */
@@ -32,6 +35,12 @@ export function GameStage(props: GameStageProps): JSX.Element {
         food={props.state.food}
         boost={props.state.boost}
       />
+      <Show when={props.state.status === 'idle'}>
+        <StartOverlay onStart={props.onStart} />
+      </Show>
+      <Show when={props.state.status === 'game-over'}>
+        <GameOverOverlay score={props.state.score} onRestart={props.onRestart} />
+      </Show>
     </div>
   );
 }
