@@ -13,13 +13,14 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0 && prettier --check .",
     "test": "vitest run",
-    "test:e2e": "echo 'e2e smoke is a stub in chunk 01 — the real Playwright spec lands in chunk 06'"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "solid-js": "^1.9.14"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^26.2.0",
     "eslint": "^10.8.1",
     "eslint-config-prettier": "^10.1.8",

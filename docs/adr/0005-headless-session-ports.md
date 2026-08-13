@@ -118,10 +118,13 @@ entry are added instead, scoped to `src/entities/**` and
     'no-restricted-properties': ['error',
       // Targets the PROPERTY, not the object, so `Math.max` / `.floor` /
       // `.round` / `.imul` — all real call sites in `entities/game` — stay
-      // legal. Cost accepted, not closed: `(Math as unknown as { random(): number }).random()`
+      // legal. Deliberately not closed: `(Math as unknown as { random(): number }).random()`
       // launders past this the same way the rejected `globalThis` property
-      // rule did, and no rule here catches it — banning the bare `Math`
-      // identifier would take every legitimate use down with it.
+      // rule did. Closing it means banning the bare `Math` identifier, which
+      // takes every legitimate call site with it — and the cast is not an
+      // accident anyone commits by mistake, it is written on purpose to get
+      // past a rule the author knew was there. This rule catches accidents;
+      // deliberate laundering is a review problem.
       { object: 'Math', property: 'random', message: 'Determinism: take the Rng port (ADR 0004).' },
     ],
   },

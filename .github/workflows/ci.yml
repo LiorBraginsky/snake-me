@@ -36,7 +36,13 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
-      # A no-op stub in chunk 01. It is wired now so that chunk 06 replaces a
-      # script body instead of editing this workflow — editing a workflow renames
-      # nothing here, but it is the classic way to silently break a required check.
+      # Browsers do not come from the pnpm store. Chromium only: one smoke on
+      # one browser is the ratified scope (spec §8); a cross-browser matrix is
+      # YAGNI for a portfolio piece.
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # The spec's webServer runs `pnpm build` itself, so this rebuilds what
+      # the `pnpm build` gate above already produced. Kept deliberately: the
+      # build is a gate in its own right and must fail on its own line, and
+      # one webServer command keeps local and CI on a single code path.
       - run: pnpm test:e2e

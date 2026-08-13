@@ -7,7 +7,10 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   // Never looked at.
   {
-    ignores: ['dist/**', 'coverage/**'],
+    // ESLint does not read .gitignore. Playwright's report and artifact
+    // directories carry generated files; without this, `eslint .` walks into
+    // them and `--max-warnings=0` fails on output nobody wrote.
+    ignores: ['dist/**', 'coverage/**', 'playwright-report/**', 'test-results/**'],
   },
 
   // Baseline JavaScript + TypeScript correctness.
@@ -191,6 +194,17 @@ export default tseslint.config(
         // motivating example clean.
         { name: 'globalThis', message: 'Headless by contract: take a port (ADR 0005).' },
       ],
+      // Targets the PROPERTY, not the object, so `Math.max` / `.floor` /
+      // `.round` / `.imul` — every real call site in `entities/game` — stay
+      // legal. A cast on `Math` itself
+      // (`(Math as unknown as { random(): number }).random()`) launders past
+      // this the same way the rejected `globalThis` property rule above did,
+      // and it is deliberately not closed: closing it means banning the bare
+      // `Math` identifier, which takes every legitimate call site with it —
+      // and the cast is not an accident anyone commits by mistake, it is
+      // written on purpose to get past a rule the author knew was there. This
+      // rule catches accidents; deliberate laundering is a review problem
+      // (ADR 0005).
       'no-restricted-properties': [
         'error',
         {
