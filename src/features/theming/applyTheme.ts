@@ -29,8 +29,12 @@ export function applyTheme(theme: Theme): void {
 /**
  * camelCase -> `--kebab-case`, with no lookup table: the property name IS the
  * field name, which is what keeps the frozen contract mechanical.
+ *
+ * Exported slice-internally so `applyTheme.test.ts` can exercise the transform
+ * without a DOM — it is NOT re-exported from `index.ts`; the public API is
+ * `applyTheme` only.
  */
-function themeCustomProperties(tokens: ThemeTokens): Readonly<Record<string, string>> {
+export function themeCustomProperties(tokens: ThemeTokens): Readonly<Record<string, string>> {
   const properties: Record<string, string> = {};
 
   for (const [field, value] of Object.entries(tokens)) {

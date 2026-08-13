@@ -72,12 +72,20 @@ describe('createScoreboardState', () => {
   });
 
   it('drops entries of the wrong shape and re-ranks what is left', () => {
-    const stored = JSON.stringify([
-      { score: 10, date: '2026-08-13T01:00:00.000Z' },
-      { score: 'high', date: '2026-08-13T02:00:00.000Z' },
-      { date: '2026-08-13T03:00:00.000Z' },
-      { score: 80, date: '2026-08-13T04:00:00.000Z' },
-    ]);
+    // Hand-written JSON, not `JSON.stringify`: `1e999` is a valid JSON number
+    // literal that overflows to `Infinity` once parsed — `JSON.stringify`
+    // could never produce it from a JS value (it serialises `Infinity` to
+    // `null`), so the only way to feed it to the decoder is as raw text.
+    const stored =
+      '[' +
+      '{"score":10,"date":"2026-08-13T01:00:00.000Z"},' +
+      '{"score":"high","date":"2026-08-13T02:00:00.000Z"},' +
+      '{"date":"2026-08-13T03:00:00.000Z"},' +
+      '{"score":50},' + // no date at all
+      '{"score":50,"date":42},' + // date present, but not a string
+      '{"score":1e999,"date":"2026-08-13T05:00:00.000Z"},' + // valid JSON, parses to Infinity
+      '{"score":80,"date":"2026-08-13T04:00:00.000Z"}' +
+      ']';
 
     expect(
       harness({ [KEY]: stored })

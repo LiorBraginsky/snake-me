@@ -8,8 +8,14 @@ export const _localStorageIsAWebStorage = (): WebStorage => localStorage;
 
 /**
  * An in-memory stand-in for `Storage`. Duplicated in the theming and scoreboard
- * tests on purpose: a shared helper would need a home under `src/`, and every
- * file under `src/` must belong to a slice (`boundaries/no-unknown-files`).
+ * tests on purpose — NOT because a shared helper has nowhere to live: a
+ * top-level `test/` directory already exists (`test/toolchain.test.ts`), is in
+ * `vite.config.ts`'s and `tsconfig.json`'s includes, and sits outside
+ * `boundaries`' `src/**` glob, so a shared fixture could be added there
+ * without touching the architecture. The real reason is colocation: each test
+ * file stays readable and self-contained with its own ten-line fixture,
+ * instead of asking a reader to jump to a shared module to understand what
+ * `fakeWebStorage` does.
  */
 function fakeWebStorage(seed: Record<string, string> = {}) {
   const cells = new Map(Object.entries(seed));
@@ -41,6 +47,17 @@ describe('createWebStorageStore', () => {
     const store = createWebStorageStore(() => fakeWebStorage());
 
     expect(store.get('nope', orFallback)).toBe('fallback');
+  });
+
+  it('hands `decode` the value `undefined` itself for a missing key, not `null`', () => {
+    // `orFallback` above can't tell `undefined` and `null` apart (neither is a
+    // string), so it would pass even if `read()` returned `null` — which is
+    // exactly what `JSON.parse(raw as string)` does for a missing key, since
+    // `JSON.parse(null)` coerces to `JSON.parse("null")` and returns `null`.
+    // The port's contract (spec §7) is `undefined`, specifically.
+    const store = createWebStorageStore(() => fakeWebStorage());
+
+    expect(store.get('nope', asIs)).toBeUndefined();
   });
 
   it('decodes `undefined` for corrupt JSON', () => {

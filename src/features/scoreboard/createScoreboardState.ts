@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js';
+import { createSignal, untrack } from 'solid-js';
 import type { Accessor } from 'solid-js';
 
 import { addScore } from '../../entities/game';
@@ -35,8 +35,14 @@ export function createScoreboardState(options: ScoreboardStateOptions): Scoreboa
 
   return {
     entries,
+    // `untrack`, not `entries()` directly: calling the accessor here would be
+    // a subscribe-then-write in the same statement (solid/reactivity) — this
+    // codebase's own rule, stated at `createThemeState.ts`'s initial read. It
+    // only worked before because `App.tsx` happens to call `record` from
+    // inside `on()`, which untracks; a future caller in a tracked scope would
+    // subscribe and then write to the same signal, re-entering infinitely.
     record: (score) => {
-      const next = addScore(entries(), { score, date: options.now() });
+      const next = addScore(untrack(entries), { score, date: options.now() });
 
       setEntries(next);
       options.store.set(SCOREBOARD_STORAGE_KEY, next);
