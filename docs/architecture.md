@@ -187,11 +187,11 @@ background included.
 | `snakeBody` | `--snake-body` | body tiles |
 | `snakeTail` | `--snake-tail` | tail tile |
 | `snakeShadow` | `--snake-shadow` | bottom offset shadow on every segment |
-| `itemFood` | `--item-food` | apple body, its outline/highlight mixes, and the snake's tongue |
+| `itemFood` | `--item-food` | apple body, its outline/highlight mixes, the snake's tongue, and the HUD's game-over chip |
 | `itemFoodAccent` | `--item-food-accent` | apple stem + leaf |
 | `itemBoost` | `--item-boost` | bolt body, its outline mix, its halo, the boost chip |
 | `hudBg` | `--hud-bg` | page background, HUD bar, overlay panel, button text |
-| `hudText` | `--hud-text` | HUD and overlay text, focus ring |
+| `hudText` | `--hud-text` | page text, HUD text and hairline, overlay text, focus ring |
 | `hudAccent` | `--hud-accent` | score value, default chip, primary button |
 
 Nothing type-checks these strings against `themes.ts`. A rename lands in both

@@ -14,11 +14,11 @@ export interface SnakeViewProps {
  * engine builds each tick's snake as [newHead, ...previousSegments]: every
  * interior Point survives BY REFERENCE, so a reference-keyed <For> inserts one
  * row, removes one row, and never touches the rows in between. That makes a tick
- * cost exactly two transform writes (head and tail) regardless of length. One
- * <For> over the whole snake would work too, but a prepend shifts every index,
- * so N index signals would fire per tick to recompute roles that did not change.
- * <Index> would be strictly wrong here: it keys by position, so all N segments
- * would rewrite their transform every tick.
+ * cost exactly two coordinate custom-property writes (head and tail) regardless
+ * of length. One <For> over the whole snake would work too, but a prepend shifts
+ * every index, so N index signals would fire per tick to recompute roles that
+ * did not change. <Index> would be strictly wrong here: it keys by position, so
+ * all N segments would rewrite their --x / --y custom properties every tick.
  */
 export function SnakeView(props: SnakeViewProps): JSX.Element {
   const interior = createMemo(() => props.snake.slice(1, -1));
