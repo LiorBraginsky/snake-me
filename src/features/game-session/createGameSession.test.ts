@@ -230,15 +230,48 @@ describe('createGameSession', () => {
     dispose();
   });
 
-  it('restart() produces a fresh running round from a running state', () => {
+  it('start() begins a round from idle', () => {
+    const { session, dispose } = buildSession({ rules: TINY, rng: stubRng([0]) });
+
+    session.start();
+
+    expect(session.state().status).toBe('running');
+
+    dispose();
+  });
+
+  it('togglePause() pauses a running round and resumes it', () => {
+    const { session, dispose } = buildSession({ rules: TINY, rng: stubRng([0]) });
+
+    session.start();
+    session.togglePause();
+    expect(session.state().status).toBe('paused');
+
+    session.togglePause();
+    expect(session.state().status).toBe('running');
+
+    dispose();
+  });
+
+  it('restart() produces a fresh running round from a dirtied running state', () => {
     const { session, dispose } = buildSession({ rules: TINY, rng: stubRng([0, 0]) });
 
     session.dispatch({ kind: 'confirm' });
+    session.tick();
+    session.tick();
+
+    // Two ticks along the default heading walk the head off (2,2), and the
+    // state object with it — this is the "dirtied" state restart() must undo.
+    const dirtied = session.state();
+    expect(dirtied.snake[0]).toEqual({ x: 4, y: 2 });
+
     session.restart();
 
+    expect(session.state()).not.toBe(dirtied);
     expect(session.state().status).toBe('running');
     expect(session.state().score).toBe(0);
     expect(session.state().snake).toHaveLength(3);
+    expect(session.state().snake[0]).toEqual({ x: 2, y: 2 });
 
     dispose();
   });

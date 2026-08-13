@@ -89,6 +89,13 @@ export function createGameLoop(options: GameLoopOptions): void {
   });
 
   onCleanup(() => {
+    // Cleared here too, not just derived from `status`: `advance()` can
+    // dispose this loop's own root from inside `onFrame` while `scheduled` is
+    // already `undefined` (cleared at the top of the callback) — with no
+    // cancel to run, this is the only place left that stops `onFrame`'s tail
+    // from reading a stale `true` and arming a fresh frame on a torn-down loop.
+    isRunning = false;
+
     if (scheduled !== undefined) {
       frames.cancelAnimationFrame(scheduled);
       scheduled = undefined;

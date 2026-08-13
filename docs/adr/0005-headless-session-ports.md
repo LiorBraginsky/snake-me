@@ -8,8 +8,9 @@
 
 Chunk 03 wires the pure engine (ADR 0004) into a reactive session and a
 `requestAnimationFrame` loop, and drives both through logic tests only —
-`docs/architecture.md:159` fixes `environment: 'node'` as the **final** test
-environment, not a staging one, so jsdom never enters the picture.
+`docs/architecture.md` § Enforcement, "Engine determinism" row, fixes
+`environment: 'node'` as the **final** test environment, not a staging one, so
+jsdom never enters the picture.
 
 That constraint forces a decision before a line of `createGameLoop` is
 written: `window`, `document`, `requestAnimationFrame` and `Date` do not exist
@@ -80,8 +81,9 @@ covers — the one place production non-determinism is allowed to originate
 
 **The technical half ships as a lint rule, not a comment.** A missed injection
 is a missing import to `boundaries/dependencies` — a global is not one — so it
-cannot see this. `no-restricted-globals` is added instead, scoped to
-`src/entities/**` and `src/features/game-session/**`, tests excluded:
+cannot see this. `no-restricted-globals` plus a narrow `no-restricted-properties`
+entry are added instead, scoped to `src/entities/**` and
+`src/features/game-session/**`, tests excluded:
 
 ```js
 {
@@ -96,6 +98,31 @@ cannot see this. `no-restricted-globals` is added instead, scoped to
       { name: 'cancelAnimationFrame', message: 'Take a FrameScheduler port (ADR 0005).' },
       { name: 'performance', message: 'Time arrives as the frame timestamp (ADR 0005).' },
       { name: 'Date', message: 'Determinism: the caller supplies clock values (ADR 0004).' },
+      { name: 'setTimeout', message: 'ADR 0005 rejects setInterval/setTimeout: take a FrameScheduler port.' },
+      { name: 'setInterval', message: 'ADR 0005 rejects setInterval/setTimeout: take a FrameScheduler port.' },
+      { name: 'queueMicrotask', message: 'Headless by contract: take a port (ADR 0005).' },
+      { name: 'self', message: 'Headless by contract: take a port (ADR 0005).' },
+      { name: 'navigator', message: 'Headless by contract: take a port (ADR 0005).' },
+      { name: 'crypto', message: 'Determinism: take the Rng port (ADR 0004).' },
+      // Bans the bare identifier, not just a `globalThis.window`-shaped member
+      // access — this catches every reference eslint-scope resolves to the
+      // global variable `globalThis`, including one laundered through a type
+      // assertion, e.g. `(globalThis as unknown as { window: Window }).window`.
+      // A `no-restricted-properties` entry keyed on the object name
+      // `globalThis` was tried first and rejected: it inspects
+      // `MemberExpression.object.name`, which is `undefined` once the object
+      // is a `TSAsExpression` rather than a bare `Identifier`, so it lints
+      // that exact cast clean.
+      { name: 'globalThis', message: 'Headless by contract: take a port (ADR 0005).' },
+    ],
+    'no-restricted-properties': ['error',
+      // Targets the PROPERTY, not the object, so `Math.max` / `.floor` /
+      // `.round` / `.imul` — all real call sites in `entities/game` — stay
+      // legal. Cost accepted, not closed: `(Math as unknown as { random(): number }).random()`
+      // launders past this the same way the rejected `globalThis` property
+      // rule did, and no rule here catches it — banning the bare `Math`
+      // identifier would take every legitimate use down with it.
+      { object: 'Math', property: 'random', message: 'Determinism: take the Rng port (ADR 0004).' },
     ],
   },
 },
@@ -104,6 +131,15 @@ cannot see this. `no-restricted-globals` is added instead, scoped to
 `features/theming` is deliberately **not** in the glob: writing theme tokens
 onto `document` is exactly that slice's job (ADR 0003), so banning `document`
 there would be the rule fighting the architecture instead of guarding it.
+
+`src/shared/**` is outside the glob too, but not because `shared/input` (a
+named call site above, and where `KeyDownTarget` lives) needs shielding — it
+never reaches for `window` itself, only declares the port shape and reads off
+whatever the caller injects: the actual reason is that chunk 05's
+`shared/storage` is specified as a `localStorage` adapter
+(`docs/architecture.md`'s slice inventory), which this rule's `localStorage`
+entry would ban outright, so the glob stops at `features/game-session` for
+now rather than reaching one layer further down.
 
 **Loop semantics decided alongside the ports, so they do not become five open
 questions in chunk 04's review:**
@@ -182,7 +218,8 @@ questions in chunk 04's review:**
   §8 (logic-only testing policy) — `docs/specs/2026-08-12-snake-game-design.md`
 - ADR 0004 — Engine API: the no-op-by-reference contract this session's signal
   relies on, and the precedent for injected configuration over ambient access
-- `docs/architecture.md:159` — `node` as the final test environment, not staging
+- `docs/architecture.md` § Enforcement, "Engine determinism" row — `node` as
+  the final test environment, not staging
 - `docs/architecture.md` § Trap — why a green `pnpm lint` is not by itself
   evidence a rule ran, and the deliberate-violation discipline this ADR's lint
   rule follows

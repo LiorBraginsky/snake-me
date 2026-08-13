@@ -19,11 +19,13 @@ function fakeFrames() {
   let nextHandle = 1;
   let pending: { handle: number; callback: (timeMs: number) => void } | undefined;
   let cancels = 0;
+  let requests = 0;
 
   return {
     requestAnimationFrame(callback: (timeMs: number) => void): number {
       const handle = nextHandle;
       nextHandle += 1;
+      requests += 1;
       pending = { handle, callback };
 
       return handle;
@@ -36,6 +38,8 @@ function fakeFrames() {
     },
     isPending: (): boolean => pending !== undefined,
     cancels: (): number => cancels,
+    /** Total `requestAnimationFrame` calls across the fake's lifetime. */
+    requests: (): number => requests,
     /** Fires the pending frame at `timeMs`. Clearing first is deliberate. */
     frame(timeMs: number): void {
       const current = pending;
@@ -49,6 +53,51 @@ function fakeFrames() {
 }
 
 type FakeFrames = ReturnType<typeof fakeFrames>;
+
+/**
+ * Unlike `fakeFrames`, which overwrites a single `pending` slot, this tracks
+ * every outstanding handle in a `Map` — so a second `requestAnimationFrame`
+ * call issued before the first is cancelled shows up as two pending handles
+ * instead of silently replacing one fake frame with another. That distinction
+ * is the whole point: a real browser keeps both rAF registrations alive as
+ * two independent chains — a leaked handle plus a doubled tick rate — which a
+ * single-slot fake cannot reveal because the second `requestAnimationFrame`
+ * call just clobbers the first one's record.
+ */
+function fakeMultiSlotFrames() {
+  let nextHandle = 1;
+  const pending = new Map<number, (timeMs: number) => void>();
+
+  return {
+    requestAnimationFrame(callback: (timeMs: number) => void): number {
+      const handle = nextHandle;
+      nextHandle += 1;
+      pending.set(handle, callback);
+
+      return handle;
+    },
+    cancelAnimationFrame(handle: number): void {
+      pending.delete(handle);
+    },
+    pendingCount: (): number => pending.size,
+    /** Fires the SOLE pending frame; throws if there isn't exactly one. */
+    frame(timeMs: number): void {
+      if (pending.size !== 1) {
+        throw new Error(`expected exactly one pending frame, found ${pending.size}`);
+      }
+      const [handle] = [...pending.keys()];
+      if (handle === undefined) {
+        throw new Error('no frame is pending');
+      }
+      const callback = pending.get(handle);
+      if (callback === undefined) {
+        throw new Error('no frame is pending');
+      }
+      pending.delete(handle);
+      callback(timeMs);
+    },
+  };
+}
 
 /** Compile-time proof, never executed: `window` satisfies `FrameScheduler`. */
 export const _windowIsAFrameScheduler = (): FrameScheduler => window;
@@ -201,6 +250,36 @@ describe('createGameLoop', () => {
     unboosted.dispose();
   });
 
+  it('re-derives the interval from the LIVE signal, not a value pinned at construction', () => {
+    const frames = fakeFrames();
+    const [state, setState] = createSignal(stateFixture());
+    let advanceCount = 0;
+
+    const { dispose } = withRoot(() =>
+      createGameLoop({
+        state,
+        rules: TINY,
+        frames,
+        advance: () => {
+          advanceCount += 1;
+        },
+      }),
+    );
+
+    frames.frame(0); // starts the clock, unboosted
+    frames.frame(150); // 150 >= 150: ticks once, accumulated resets to 0
+    expect(advanceCount).toBe(1);
+
+    // Boost turns on on the SAME live signal the loop was built with — no new
+    // loop, no new state object handed to `createGameLoop`.
+    setState(stateFixture({ boostTicksRemaining: 5 }));
+
+    frames.frame(250); // 100ms delta >= 150 / 1.6 = 93.75: must tick now
+    expect(advanceCount).toBe(2);
+
+    dispose();
+  });
+
   it('drops a stalled backlog instead of fast-forwarding it', () => {
     const harness = buildLoop(stateFixture());
 
@@ -241,6 +320,30 @@ describe('createGameLoop', () => {
     harness.dispose();
   });
 
+  it('resuming resets the accumulator: a stale partial interval is not owed', () => {
+    const harness = buildLoop(stateFixture());
+
+    harness.frames.frame(0);
+    harness.frames.frame(100); // 100ms into the 150ms interval, unspent at pause
+
+    harness.setState(stateFixture({ status: 'paused' }));
+    harness.setState(stateFixture({ status: 'running' }));
+
+    harness.frames.frame(1000); // first frame after resume only starts the clock
+    expect(harness.advances()).toBe(0);
+
+    // If the stale 100ms had survived the pause, this +100ms would already
+    // reach the 150ms interval. It must not: the first two frames after
+    // resume need a FULL 150ms, not the 50ms that was owed before pausing.
+    harness.frames.frame(1100);
+    expect(harness.advances()).toBe(0);
+
+    harness.frames.frame(1150); // +150ms since the post-resume clock start
+    expect(harness.advances()).toBe(1);
+
+    harness.dispose();
+  });
+
   it('stops requesting frames once advance ends the round', () => {
     const frames = fakeFrames();
     const [state, setState] = createSignal(stateFixture());
@@ -272,6 +375,67 @@ describe('createGameLoop', () => {
 
     expect(harness.frames.cancels()).toBe(1);
     expect(harness.frames.isPending()).toBe(false);
+  });
+
+  it('an advance() that flips status re-entrantly leaves exactly one armed frame', () => {
+    // `fakeFrames`'s single `pending` slot would hide a leaked second handle
+    // by simply overwriting it — this needs every outstanding handle tracked.
+    const frames = fakeMultiSlotFrames();
+    const [state, setState] = createSignal(stateFixture());
+
+    const { dispose } = withRoot(() =>
+      createGameLoop({
+        state,
+        rules: TINY,
+        frames,
+        advance: () => {
+          // Re-entrant, synchronous status flip from inside the tick this
+          // frame is driving — before this frame's own tail decides whether
+          // to re-arm itself.
+          setState(stateFixture({ status: 'paused' }));
+          setState(stateFixture({ status: 'running' }));
+        },
+      }),
+    );
+
+    frames.frame(0); // starts the clock
+    frames.frame(150); // ticks -> advance() flips running -> paused -> running
+
+    expect(frames.pendingCount()).toBe(1);
+
+    dispose();
+  });
+
+  it('does not arm a new frame if advance() disposes the loop from inside onFrame', () => {
+    // `dispose` does not exist until `withRoot` returns, but `advance` has to
+    // call it from inside the frame it is disposing — a mutable box breaks
+    // that ordering cycle.
+    const disposeRef: { current: () => void } = { current: () => {} };
+    const frames = fakeFrames();
+    const [state] = createSignal(stateFixture());
+
+    const { dispose } = withRoot(() =>
+      createGameLoop({
+        state,
+        rules: TINY,
+        frames,
+        advance: () => {
+          disposeRef.current();
+        },
+      }),
+    );
+    disposeRef.current = dispose;
+
+    frames.frame(0); // starts the clock; nothing advances yet
+    const requestsBeforeDispose = frames.requests();
+
+    // A full interval elapses: onFrame calls advance(), which disposes the
+    // loop's own root mid-callback, before onFrame's tail decides whether to
+    // re-arm itself.
+    frames.frame(150);
+
+    expect(frames.requests()).toBe(requestsBeforeDispose);
+    expect(frames.isPending()).toBe(false);
   });
 });
 
