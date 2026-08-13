@@ -5,3 +5,8 @@ pnpm-lock.yaml
 # lists, which would rewrite documents this project treats as truth. Prettier's
 # job here is code and config formatting.
 *.md
+
+# Playwright output. Prettier defaults its ignore path to .gitignore too, but
+# the gate must stay green whatever order a developer runs things in.
+playwright-report/
+test-results/

@@ -7,7 +7,10 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   // Never looked at.
   {
-    ignores: ['dist/**', 'coverage/**'],
+    // ESLint does not read .gitignore. Playwright's report and artifact
+    // directories carry generated files; without this, `eslint .` walks into
+    // them and `--max-warnings=0` fails on output nobody wrote.
+    ignores: ['dist/**', 'coverage/**', 'playwright-report/**', 'test-results/**'],
   },
 
   // Baseline JavaScript + TypeScript correctness.
