@@ -15,14 +15,22 @@ import type { Locator, Page } from '@playwright/test';
  * (docs/architecture.md § CSS custom property contract) and steers with real
  * arrow keys.
  *
- * Why the chase cannot lose the round before it scores:
+ * Why the chase is not expected to lose the round before it scores:
  *  - Self-collision is structurally impossible. The snake starts at 3
  *    segments (entities/game/rules.ts) and the shortest self-collision loop
  *    needs 5; the chase stops at the first apple, i.e. at 4.
- *  - Wall death is impossible. `nextTurn` only declines to turn when the
- *    apple is strictly ahead on the current heading, and the apple is
- *    on-board, so it is eaten before the wall. Every other case turns
- *    immediately, far from any edge.
+ *  - The chase never steers into a wall. `nextTurn` always turns toward the
+ *    apple or perpendicular to break a stale row/column, and only declines to
+ *    turn when the apple is already strictly ahead on the current heading.
+ *    The one remaining wall exposure is timing, not steering: a sweep of all
+ *    381 legal apple positions against this file's `nextTurn` plus the real
+ *    engine (entities/game/engine.ts) found that in 20 of them (~5%) the
+ *    chase reaches an edge cell with its heading already pointing off-board,
+ *    where survival needs the already-decided perpendicular turn to land
+ *    inside that same 150 ms tick (rules.ts's BASE_TICK_MS). The atomic read
+ *    below removes the torn-read race that used to waste a poll at exactly
+ *    those ticks, and the 25 ms poll gives the turn several chances to land
+ *    before the tick fires.
  *  - A stale read is never fatal. Every requested turn is perpendicular to
  *    the heading that was read; if the real heading already moved on, the
  *    engine rejects the illegal turn (entities/game/engine.ts) and the next
@@ -57,15 +65,13 @@ type Heading = keyof typeof ARROW;
 /**
  * Counters live on `window` because they have to survive between two
  * page.evaluate calls. `head` is the head element captured before the round,
- * compared by identity afterwards.
+ * compared by identity afterwards. `boardLayer` is the same kind of proof for
+ * the board layer: see the `boardIsSame` assertion below for why the mutation
+ * count alone cannot be trusted without it.
  */
 type ProbeWindow = Window & {
-  __snakeProbe?: { board: number; entities: number; head: Element };
+  __snakeProbe?: { board: number; entities: number; head: Element; boardLayer: Element };
 };
-
-function isHeading(value: string | null): value is Heading {
-  return value !== null && value in ARROW;
-}
 
 async function cellOf(locator: Locator): Promise<Cell> {
   return locator.evaluate((el) => ({
@@ -74,12 +80,55 @@ async function cellOf(locator: Locator): Promise<Cell> {
   }));
 }
 
-async function headingOf(page: Page): Promise<Heading> {
-  const value = await page.locator('.snake__face').getAttribute('data-direction');
-  if (!isHeading(value)) {
-    throw new Error(`unexpected data-direction: ${String(value)}`);
-  }
-  return value;
+interface ChaseState {
+  readonly head: Cell;
+  readonly apple: Cell;
+  readonly facing: Heading;
+}
+
+/**
+ * Reads the head cell, the apple cell and the head's facing atomically, in
+ * one round trip. Three separate reads (the original shape: `cellOf(head)`,
+ * `cellOf(apple)`, a `.snake__face` attribute read) can straddle an engine
+ * tick — the tick fires between round-trips and the callback ends up with a
+ * post-tick head paired with a pre-tick heading. That torn read matters most
+ * at exactly the ticks the spec header calls out (an edge cell, heading
+ * already pointing off-board): a wrong `facing` there can make `nextTurn`
+ * miscompute or get rejected by the engine, wasting a poll at the one moment
+ * that cannot afford to waste one.
+ *
+ * Returns `null`, never throws, when any of the three elements is
+ * momentarily missing (e.g. a re-render mid-read). Playwright's `expect.poll`
+ * calls this callback outside its own try/catch, so a throw here is an
+ * immediate hard failure with no retry — the honest response to a transient
+ * gap is to skip steering for this cycle, not to blow up the test.
+ */
+async function readChaseState(page: Page): Promise<ChaseState | null> {
+  return page.evaluate((): ChaseState | null => {
+    const headEl = document.querySelector<HTMLElement>('.snake__segment--head');
+    const appleEl = document.querySelector<HTMLElement>('.item--food');
+    const faceEl = document.querySelector('.snake__face');
+    if (headEl === null || appleEl === null || faceEl === null) {
+      return null;
+    }
+
+    const facing = faceEl.getAttribute('data-direction');
+    if (facing !== 'up' && facing !== 'down' && facing !== 'left' && facing !== 'right') {
+      return null;
+    }
+
+    return {
+      head: {
+        x: Number(headEl.style.getPropertyValue('--x')),
+        y: Number(headEl.style.getPropertyValue('--y')),
+      },
+      apple: {
+        x: Number(appleEl.style.getPropertyValue('--x')),
+        y: Number(appleEl.style.getPropertyValue('--y')),
+      },
+      facing,
+    };
+  });
 }
 
 /**
@@ -119,7 +168,6 @@ test('start, move, and grow the score in a real round', async ({ page }) => {
 
   const stage = page.locator('.stage');
   const head = page.locator('.snake__segment--head');
-  const apple = page.locator('.item--food');
   const scoreValue = page.locator('.hud__score-value');
 
   // Board size comes from the DOM, so this file restates no gameplay number:
@@ -143,7 +191,7 @@ test('start, move, and grow the score in a real round', async ({ page }) => {
       throw new Error('stage layers or head segment missing at probe install');
     }
 
-    const counters = { board: 0, entities: 0, head: headSegment };
+    const counters = { board: 0, entities: 0, head: headSegment, boardLayer };
     (window as ProbeWindow).__snakeProbe = counters;
 
     const options: MutationObserverInit = {
@@ -174,19 +222,17 @@ test('start, move, and grow the score in a real round', async ({ page }) => {
   await expect
     .poll(
       async () => {
-        const [headCell, appleCell, facing] = await Promise.all([
-          cellOf(head),
-          cellOf(apple),
-          headingOf(page),
-        ]);
-        const turn = nextTurn(headCell, appleCell, facing, board);
-        if (turn !== undefined) {
-          await page.keyboard.press(ARROW[turn]);
+        const state = await readChaseState(page);
+        if (state !== null) {
+          const turn = nextTurn(state.head, state.apple, state.facing, board);
+          if (turn !== undefined) {
+            await page.keyboard.press(ARROW[turn]);
+          }
         }
         return Number(await scoreValue.textContent());
       },
       {
-        intervals: [50],
+        intervals: [25],
         timeout: 30_000,
         message: 'steered toward the apple but the score never grew',
       },
@@ -202,6 +248,7 @@ test('start, move, and grow the score in a real round', async ({ page }) => {
       board: counters.board,
       entities: counters.entities,
       headIsSame: counters.head === document.querySelector('.snake__segment--head'),
+      boardIsSame: counters.boardLayer === document.querySelector('.stage__layer--board'),
     };
   });
 
@@ -212,6 +259,13 @@ test('start, move, and grow the score in a real round', async ({ page }) => {
   // This does NOT prove the compositor never repaints it — that stays the
   // manual DevTools paint-flashing check.
   expect(probe.board).toBe(0);
+  // A MutationObserver observes a NODE, not a selector. If a tick ever tore
+  // down and rebuilt `.stage__layer--board` — exactly the regression this
+  // probe exists to catch — the childList record would land on `.stage` (the
+  // parent), the observed node would already be detached, and `board` would
+  // read 0 forever, for the wrong reason. Zero mutations is only meaningful
+  // together with proof the observed node is still the live one.
+  expect(probe.boardIsSame).toBe(true);
   // Mechanism 2: the head is one persistent element; a tick rewrites its two
   // coordinate custom properties, it never rebuilds the node.
   expect(probe.headIsSame).toBe(true);

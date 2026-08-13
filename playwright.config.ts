@@ -28,6 +28,12 @@ export default defineConfig({
     // silently moves to 4174 and Playwright waits on 4173 until it times out.
     command: `pnpm build && pnpm exec vite preview --port ${PREVIEW_PORT} --strictPort`,
     url: BASE_URL,
+    // `false` in CI: every run rebuilds and serves fresh. Locally this is
+    // `true`, so if anything is already listening on 4173 — including a
+    // preview server left over from a previous local run — Playwright reuses
+    // it and skips `command` entirely, `pnpm build` included. A local
+    // `pnpm test:e2e` can therefore pass against a stale build; killing
+    // whatever holds port 4173 (or a machine reboot) forces a fresh one.
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

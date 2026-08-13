@@ -39,27 +39,37 @@ plays.
 `Date.now()`-seeded round: it clicks Start, then chases the apple with real
 arrow-key presses until the score moves.
 
-**It reads the DOM contract that already exists.** The chase polls three values
-every 50 ms — `--x` / `--y` off `.snake__segment--head` and `.item--food`, and
-`data-direction` off `.snake__face` — and presses at most one arrow per poll.
-Board size comes from `--board-cols` / `--board-rows` on `.stage`. All of these
-are frozen in `docs/architecture.md` § CSS custom property contract, so the
-spec restates **no** gameplay number: it asserts the score *grows*, never that
-it equals 10, and an engine-constant change cannot break it.
+**It reads the DOM contract that already exists.** The chase reads three
+values — `--x` / `--y` off `.snake__segment--head` and `.item--food`, and
+`data-direction` off `.snake__face` — atomically, in one round trip, every
+25 ms, and presses at most one arrow per poll. Board size comes from
+`--board-cols` / `--board-rows` on `.stage`. All of these are frozen in
+`docs/architecture.md` § CSS custom property contract, so the spec restates
+**no** gameplay number: it asserts the score *grows*, never that it equals 10,
+and an engine-constant change cannot break it.
 
 **Nothing under `src/` changed in chunk 06** — no `?seed=`, no `window` hook,
 no `data-testid`, not one attribute added for the test's benefit. Every locator
 in the spec matched the shipped DOM on the first run, with zero corrections.
 
-**The chase cannot lose the round before it scores**, and the argument is
-recorded in the spec's header rather than trusted to luck:
+**The chase is not expected to lose the round before it scores**, and the
+argument is recorded in the spec's header rather than trusted to luck:
 
 - Self-collision is structurally impossible — the snake starts at 3 segments
   (`rules.ts`) and the shortest self-collision loop needs 5; the chase ends at
   the first apple, i.e. at length 4.
-- Wall death is impossible — the chase only declines to turn when the apple is
-  strictly ahead on the current heading, and the apple is on-board, so it is
-  eaten before the wall is reached.
+- The chase never steers into a wall — `nextTurn` always turns toward the
+  apple or perpendicular to break a stale row/column, and only declines to
+  turn when the apple already sits ahead on the current heading. The one
+  remaining wall exposure is timing, not steering: a sweep of all 381 legal
+  apple positions against `nextTurn` plus the real engine (`engine.ts`) found
+  that in 20 of them (~5%) the chase reaches an edge cell with its heading
+  already pointing off-board, where survival needs the already-decided
+  perpendicular turn to land inside that same 150 ms tick (`rules.ts`'s
+  `BASE_TICK_MS`). The spec reads the head cell, the apple cell and the
+  heading atomically in one round trip — three separate reads could straddle
+  a tick and waste a poll at exactly this moment — and polls every 25 ms, so
+  the turn gets several chances to land before the tick fires.
 - A stale read is never fatal — every requested turn is perpendicular to the
   heading that was *read*; if the real heading has already moved on, the engine
   rejects the illegal turn (ADR 0004's no-op contract) and the next poll
@@ -75,11 +85,17 @@ re-randomise the apple for zero extra coverage:**
 
 - **The board-repaint carry-over from chunk 04.** Two `MutationObserver`s are
   installed before Start; afterwards the spec asserts `entities > 0` **first**,
-  then `board === 0`, then head-node identity. The positive control is not
-  decoration: the board layer has no children, so a broken probe would report
-  `0` for the honest reason and the assertion would pass while proving nothing
-  (`docs/architecture.md` § Trap — a green gate is not by itself evidence the
-  check ran).
+  then `board === 0`, then board-node identity, then head-node identity. The
+  positive control is not decoration: the board layer has no children, so a
+  broken probe would report `0` for the honest reason and the assertion would
+  pass while proving nothing (`docs/architecture.md` § Trap — a green gate is
+  not by itself evidence the check ran). The board-node identity check closes
+  the same gap a different way: a `MutationObserver` watches a *node*, so if a
+  tick ever tore the board layer down and rebuilt it, the `childList` record
+  would land on `.stage` (the parent), the observed node would already be
+  detached, and `board` would read `0` forever — for the wrong reason. Zero
+  mutations is only meaningful together with proof the observed node is still
+  the live one.
 - **One `applyTheme` assertion**: `<html>` carries a non-empty `data-theme`
   after boot. ADR 0003's DOM effects are the one thing the logic-only suite
   structurally cannot cover, and this is the cheapest true statement about them.

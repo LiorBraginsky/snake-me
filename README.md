@@ -40,7 +40,8 @@ for a temporary speed-up worth extra points, or let it expire. Your best five
 scores and your chosen theme survive a reload. Every number behind those
 sentences — board size, tick interval, boost odds, duration and payout — is a
 named constant in [`src/entities/game/rules.ts`](src/entities/game/rules.ts) and
-appears nowhere else in the codebase.
+appears nowhere else in production code — the only other copy is the golden test
+that pins it.
 
 ## Architecture
 
@@ -82,13 +83,14 @@ and gets the same round every time. The lint config gives that layer *no*
 allow-policy at all, so the purity rule is a build failure rather than a promise.
 
 **Ambient capabilities are ports, not globals.**
-The game loop takes a `FrameScheduler`; the keyboard adapter takes a
-`KeyDownTarget`; storage takes a `WebStorage` provider. All three are structural
-subsets of `Window`, so production wiring is literally `window` — no adapter
-module, no extra slice — while tests drive time by passing numbers to a fake. A
-second lint rule bans `window`, `document`, `Date`, `setTimeout`, `localStorage`
-and ten more identifiers inside those slices, and it is written to survive a
-type-cast laundering attempt. The result: the whole test suite runs under Node
+The game loop takes a `FrameScheduler` and the keyboard adapter takes a
+`KeyDownTarget` — both structural subsets of `Window`, so production wiring is
+literally `window`, no adapter module and no extra slice, while tests drive time
+by passing numbers to a fake. Storage takes a *lazy* `WebStorage` provider
+instead, because reading the `localStorage` property itself throws when storage
+is blocked. A second lint rule bans `window`, `document`, `Date`, `setTimeout`,
+`localStorage` and nine more identifiers inside those slices, and it is written
+to survive a type-cast laundering attempt. The result: the whole test suite runs under Node
 with no jsdom and no fake timers.
 
 **A green gate is not evidence that the gate ran.**
@@ -98,8 +100,9 @@ every import as unknown and fired on nothing, while printing green. Every
 architectural rule here has therefore been proven with a *deliberate violation*
 that was shown to fail before the rule was trusted, and any edit to those rules
 has to repeat the proof.
-[`docs/architecture.md` § Trap](docs/architecture.md#enforcement) catalogues the
-four settings that each silently delete part of the architecture if removed.
+[`docs/architecture.md` § Trap](docs/architecture.md#trap-four-things-make-the-boundaries-gate-real)
+catalogues the four settings that each silently delete part of the architecture
+if removed.
 
 **Theming is 14 CSS custom properties and one crossing point.**
 Six themes live in a typed registry; a single function writes their tokens onto
@@ -114,10 +117,12 @@ tick has nothing to invalidate. The engine preserves each surviving segment's
 object identity, so a reference-keyed list inserts one row and removes one — the
 interior is never touched — and movement writes only two coordinate custom
 properties while the `transform` that consumes them stays in CSS. The end-to-end
-smoke asserts the first of those mechanisms directly: a `MutationObserver` on the
-board layer must record **zero** mutations across a whole live round, while a
-second observer on the entity layer must record many. The second one is the
-point — a probe that sees nothing everywhere proves nothing.
+smoke asserts the first of those mechanisms directly: from before the round
+starts until the first apple is eaten, a `MutationObserver` on the board layer
+must record **zero** mutations, a second observer on the entity layer must record
+many, and the board node must still be the node the observer was attached to. All
+three parts carry weight — a probe that sees nothing everywhere proves nothing,
+and an observer whose node was swapped out underneath it reports zero forever.
 
 **Tests are logic tests, deliberately.**
 No render, markup or snapshot tests: engine golden tests, storage fallback paths,
@@ -137,7 +142,7 @@ auto-merge on green.
 | `pnpm typecheck` | TypeScript strict; theme-token completeness |
 | `pnpm lint` | ESLint + `eslint-plugin-boundaries` (the four invariants above) + Prettier, at `--max-warnings=0` |
 | `pnpm test` | 138 logic tests under Vitest, `environment: 'node'` |
-| `pnpm build` | Vite production build — 28.7 kB JS / 7.8 kB CSS (10.6 kB / 2.1 kB gzipped) |
+| `pnpm build` | Vite production build — the whole game ships in ~29 kB of JS and ~8 kB of CSS, about 13 kB gzipped |
 | `pnpm test:e2e` | One Chromium Playwright smoke: load → start → the snake moves → the score grows |
 
 ## Themes
@@ -151,7 +156,7 @@ Six themes, each a palette plus a board style. Your pick persists across reloads
 | <img src="docs/media/theme-nokia.png" alt="Nokia" width="420"><br>**Nokia** | <img src="docs/media/theme-neon.png" alt="Neon" width="420"><br>**Neon** |
 
 Contrast was computed, not eyeballed: a review round measured every theme's
-snake-on-board and text pairs and fixed the five that failed.
+snake-on-board and text pairs and fixed the seven that failed.
 
 ## Run it locally
 
@@ -170,7 +175,7 @@ pnpm lint
 pnpm test
 pnpm build
 
-pnpm exec playwright install chromium   # once
+pnpm exec playwright install chromium   # once (add --with-deps on Linux)
 pnpm test:e2e
 ```
 
@@ -208,8 +213,10 @@ review found nine surviving mutants in — a snake that could pass through the t
 wall, an apple that could spawn under the snake — all killed and re-verified.
 Chunk 05 found five mutations of the theme-token emitter surviving all four
 gates, including one that voided the entire naming contract, and closed the hole
-with an executable test. Chunk 03's new lint rule was probed with a deliberate
-violation in both directions before it was believed.
+with an executable test. Chunk 05's widening of the headless-globals rule was probed
+with a deliberate violation in both directions — a banned global inside a newly
+covered slice, and the same probe inside the slice deliberately left out — before
+it was believed.
 
 ## Repo layout
 
@@ -221,7 +228,7 @@ src/
   entities/   game — the pure core
   shared/     input, storage
 e2e/          the one Playwright smoke
-test/         the cross-slice contract test
+test/         the cross-slice contract tests
 docs/
   architecture.md   the living map
   adr/              frozen decisions
