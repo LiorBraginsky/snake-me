@@ -9,6 +9,9 @@
     border-radius: 0.5rem;
     background-color: var(--hud-bg);
     color: var(--hud-text);
+    /* `body` paints the same --hud-bg, so without a hairline the bar's radius
+       and padding are invisible against the page in every theme. */
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--hud-text) 12%, transparent);
   }
 
   .hud__score {

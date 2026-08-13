@@ -25,10 +25,15 @@ export function SnakeView(props: SnakeViewProps): JSX.Element {
   const tail = createMemo(() =>
     props.snake.length > 1 ? props.snake[props.snake.length - 1] : undefined,
   );
+  // Memoized so the head's data-direction attribute effect depends on the
+  // VALUE, not on the GameState signal it is drawn from: without this, the
+  // only dynamic binding on `.snake__face` re-runs on every tick (7-11x/s)
+  // instead of only on an actual turn.
+  const direction = createMemo(() => props.direction);
 
   return (
     <>
-      <SnakeSegment at={props.snake[0]} role="head" direction={props.direction} />
+      <SnakeSegment at={props.snake[0]} role="head" direction={direction()} />
       <For each={interior()}>{(segment) => <SnakeSegment at={segment} role="body" />}</For>
       <Show when={tail()}>{(at) => <SnakeSegment at={at()} role="tail" />}</Show>
     </>

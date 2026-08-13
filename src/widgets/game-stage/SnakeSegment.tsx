@@ -3,7 +3,7 @@ import type { JSX } from 'solid-js';
 
 import type { Direction, Point } from '../../entities/game';
 
-export type SegmentRole = 'head' | 'body' | 'tail';
+type SegmentRole = 'head' | 'body' | 'tail';
 
 export interface SnakeSegmentProps {
   readonly at: Point;

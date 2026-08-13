@@ -165,6 +165,18 @@ Defaults for `dark-checker` sit on `:root` in `tokens.css` (`@layer tokens`);
 outranks every `@layer` — which is why the defaults belong in the tokens layer
 and `theme.css` can stay empty (ADR 0003).
 
+**The game root is `document.documentElement` (`:root`), not `#root` or any
+other mount node.** Chunk 05's `applyTheme` writes the 14 properties and
+`data-theme` there. That is load-bearing, not a stylistic choice: `body` paints
+`background-color: var(--hud-bg)` (`layout.css`), and every candidate mount
+node (`#root`, `.app`, `.app__game`) is a *descendant* of `body`. Custom
+properties inherit downward only, so if `applyTheme` wrote a lower element
+instead, `body` would keep the `:root` default forever and a switch to a light
+theme would repaint the HUD and the board while the page background stayed
+dark. Writing `:root` puts the inline style above `body` in the inheritance
+chain, so `body` — and everything under it — inherits every token, page
+background included.
+
 | `ThemeTokens` field | CSS property | Consumed by |
 |---|---|---|
 | `boardBg` | `--board-bg` | `.stage` background, the `solid` board style, the overlay veil |
@@ -223,15 +235,30 @@ Three mechanisms, in the order they stop work happening (spec §5, ADR 0001):
 2. The engine keeps every surviving segment's `Point` object identity across a
    tick, so a reference-keyed `<For>` over `snake.slice(1, -1)` inserts one row
    and removes one row; the interior rows are never touched. Head and tail are
-   rendered separately, so a tick costs two `transform` writes whatever the
-   snake's length. `<Index>` would be wrong here, and both items go through a
-   non-keyed `<Show>` because the engine rebuilds the boost object every tick to
-   decrement `ttlTicks`.
-3. Movement only ever writes `transform` and the two coordinate properties, and
-   `.stage__layer--entities` carries `will-change: transform` so the moving half
-   of the stage owns its own compositor layer. That is the one `will-change` in
-   the tree and it is load-bearing. Verified, not asserted: DevTools → Rendering
-   → Paint flashing during a live round, per the chunk 04 demo criterion.
+   declared directly in `SnakeView`'s JSX, outside that list, so each is one
+   persistent DOM element: a tick writes fresh `--x` / `--y` coordinate custom
+   properties onto the head element (the engine always builds a new head
+   `Point`) and, because the segment that now plays the tail role is a
+   different `Point` reference than a tick ago, onto the tail element too. The
+   `transform` itself is a static `calc()` in `entities.css` and is never
+   rewritten from script — only its two inputs are. `<Index>` would be wrong
+   here, and both items go through a non-keyed `<Show>` because the engine
+   rebuilds the boost object every tick to decrement `ttlTicks`.
+3. Movement only ever writes the two coordinate custom properties (`--x`,
+   `--y`); the `transform` that turns them into a pixel offset is declared once
+   in CSS and never touched from script. `.stage__layer--entities` carries
+   `will-change: transform` so the moving half of the stage owns its own
+   compositor layer. That is the one `will-change` in the tree and it is
+   load-bearing. Verified, not asserted: DevTools → Rendering → Paint flashing
+   during a live round, per the chunk 04 demo criterion.
+
+Compositor promotion is the browser's decision, not this codebase's —
+`will-change` is a hint, not a guarantee. If paint flashing ever shows the
+checkerboard repainting, the first suspect is not `will-change` but that
+`.stage` clips its children with `overflow: hidden` **plus** `border-radius`,
+and also carries `contain: layout style inline-size` via
+`container-type: inline-size` — a rounded clip on an ancestor is a classic
+reason Chrome masks or declines a promotion.
 
 ### Hand-off to chunk 05
 
@@ -249,6 +276,11 @@ Three mechanisms, in the order they stop work happening (spec §5, ADR 0001):
   `themes.ts`, which `CLAUDE.md` forbids.
 - **Eye and pupil colours need a `data-theme` rule** if `nokia` or `neon` wants
   them monochrome — there is no token to reach for.
+- **`applyTheme` writes to `document.documentElement` (`:root`), never to a
+  mount node further down.** `body` paints `background-color: var(--hud-bg)`
+  and inherits nothing from a descendant — writing lower would leave the page
+  background stuck on the `dark-checker` default while the board and HUD
+  switched themes underneath it.
 
 ## Enforcement
 

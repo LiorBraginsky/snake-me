@@ -22,4 +22,12 @@ describe('statusBadgeVariant', () => {
   it('prefers game over over everything else', () => {
     expect(statusBadgeVariant('game-over', 12)).toBe('game-over');
   });
+
+  it('shows paused with no boost active', () => {
+    expect(statusBadgeVariant('paused', 0)).toBe('paused');
+  });
+
+  it('shows game over with no boost active', () => {
+    expect(statusBadgeVariant('game-over', 0)).toBe('game-over');
+  });
 });

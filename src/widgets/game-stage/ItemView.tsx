@@ -18,6 +18,9 @@ export interface ItemViewProps {
 
 export function ItemView(props: ItemViewProps): JSX.Element {
   return (
+    // `item--food` / `item--boost` are a selector hook with no paint of their
+    // own — no rule in `entities.css` targets them; the sprite components
+    // style themselves.
     <div class={`item item--${props.kind}`} style={{ '--x': props.at.x, '--y': props.at.y }}>
       <Show when={props.kind === 'food'} fallback={<BoltSprite />}>
         <AppleSprite />
