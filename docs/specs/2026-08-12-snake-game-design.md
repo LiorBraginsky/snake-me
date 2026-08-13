@@ -148,8 +148,13 @@ accumulated time exceeds the current tick interval; pauses cleanly on `paused`.
 ## 5. Visual design
 
 - **Stage layers:** BoardLayer (z0) — static background, checker or solid per
-  theme, walls as border; EntityLayer (z1) — snake + items, positioned by CSS
-  transforms from grid coords (`--cell-size`); HUD (z2) — separate widget.
+  theme, the wall a ring drawn outside the board box (not a `border`: with
+  `box-sizing: border-box`, a real border would shrink the content box while
+  `aspect-ratio` applies to the border box, desynchronising the cells from the
+  entity layer); EntityLayer (z1) — snake + items, positioned by CSS transforms
+  from grid coords (`--cell-size`); HUD — separate widget, an in-flow bar above
+  the stage, sharing the board's width (chunk 04's placement decision; the spec
+  did not settle it).
 - **Snake:** square segments with gaps; **bottom offset shadow**
   (`box-shadow: 0 Npx 0 var(--snake-shadow)`) for a 2.5D tile look. Head:
   lighter fill, white eyes with pupils, small tongue. Tail: smaller, tapered.

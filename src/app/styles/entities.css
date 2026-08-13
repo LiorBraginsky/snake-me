@@ -1,0 +1,152 @@
+@layer layout {
+  /* ── Snake ─────────────────────────────────────────────────────────────── */
+  .snake__segment {
+    position: absolute;
+    inline-size: var(--cell-size);
+    block-size: var(--cell-size);
+    /* Movement is transform-only. Nothing here may become `inset`, `margin` or
+       `width`: a tick must never invalidate layout (spec §5). */
+    transform: translate(calc(var(--x) * var(--cell-size)), calc(var(--y) * var(--cell-size)));
+  }
+
+  /* The visible tile: inset so neighbours keep a gap, with the bottom offset
+     shadow that gives the 2.5D tile look (spec §2 decision 5). */
+  .snake__segment::before {
+    content: '';
+    position: absolute;
+    inset: var(--segment-gap);
+    border-radius: var(--segment-radius);
+    background-color: var(--snake-body);
+    box-shadow: 0 var(--snake-shadow-depth) 0 var(--snake-shadow);
+  }
+
+  .snake__segment--head::before {
+    background-color: var(--snake-head);
+  }
+
+  .snake__segment--tail::before {
+    /* Smaller and more tapered than a body tile (spec §5). */
+    inset: calc(var(--segment-gap) * 2.4);
+    border-radius: calc(var(--segment-radius) * 1.5);
+    background-color: var(--snake-tail);
+  }
+
+  /* Only the face rotates: rotating the segment would rotate its bottom offset
+     shadow too and break the single light direction. Sprite faces right at 0. */
+  .snake__face {
+    position: absolute;
+    inset: 0;
+    transform: rotate(var(--head-rotation, 0deg));
+  }
+
+  .snake__face[data-direction='right'] {
+    --head-rotation: 0deg;
+  }
+  .snake__face[data-direction='down'] {
+    --head-rotation: 90deg;
+  }
+  .snake__face[data-direction='left'] {
+    --head-rotation: 180deg;
+  }
+  .snake__face[data-direction='up'] {
+    --head-rotation: 270deg;
+  }
+
+  /* The two literal colours in the whole tree: ThemeTokens has no eye token and
+     spec §5 fixes the eyes as white. A monochrome theme that needs different
+     eyes uses ADR 0003's data-theme escape hatch. */
+  .snake__eye {
+    position: absolute;
+    inset-inline-end: 20%;
+    inline-size: 20%;
+    block-size: 20%;
+    border-radius: 50%;
+    background-color: #fff;
+  }
+
+  .snake__eye--left {
+    inset-block-start: 18%;
+  }
+
+  .snake__eye--right {
+    inset-block-end: 18%;
+  }
+
+  .snake__eye::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 30%;
+    inset-inline-end: 8%;
+    inline-size: 48%;
+    block-size: 48%;
+    border-radius: 50%;
+    background-color: #101418;
+  }
+
+  /* Reuses the apple's red rather than adding a 15th token. */
+  .snake__tongue {
+    position: absolute;
+    inset-block-start: 46%;
+    inset-inline-start: calc(100% - var(--segment-gap) * 1.5);
+    inline-size: 26%;
+    block-size: 10%;
+    border-radius: 0 999px 999px 0;
+    background-color: var(--item-food);
+  }
+
+  /* ── Items ─────────────────────────────────────────────────────────────── */
+  .item {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    inline-size: var(--cell-size);
+    block-size: var(--cell-size);
+    transform: translate(calc(var(--x) * var(--cell-size)), calc(var(--y) * var(--cell-size)));
+  }
+
+  .item__sprite {
+    inline-size: 88%;
+    block-size: 88%;
+    overflow: visible;
+  }
+
+  /* Sprite paint lives in CSS, not in `fill="var(--token)"`: browsers do not
+     substitute var() inside a presentation attribute. Black and white appear
+     only as color-mix anchors — never as paint. */
+  .sprite-apple__body {
+    fill: var(--item-food);
+    stroke: color-mix(in oklab, var(--item-food) 45%, #000);
+    stroke-width: 1.1;
+  }
+
+  .sprite-apple__highlight {
+    fill: color-mix(in oklab, var(--item-food) 40%, #fff);
+  }
+
+  .sprite-apple__stem {
+    fill: none;
+    stroke: color-mix(in oklab, var(--item-food-accent) 55%, #000);
+    stroke-width: 1.3;
+    stroke-linecap: round;
+  }
+
+  .sprite-apple__leaf {
+    fill: var(--item-food-accent);
+    stroke: color-mix(in oklab, var(--item-food-accent) 50%, #000);
+    stroke-width: 0.8;
+  }
+
+  .sprite-bolt {
+    /* The soft halo (spec §5). Static: the bolt never moves once spawned. */
+    filter: drop-shadow(
+      0 0 calc(var(--cell-size) * 0.22) color-mix(in oklab, var(--item-boost) 60%, transparent)
+    );
+  }
+
+  .sprite-bolt__body {
+    fill: var(--item-boost);
+    stroke: color-mix(in oklab, var(--item-boost) 40%, #000);
+    stroke-width: 1.1;
+    stroke-linejoin: round;
+  }
+}

@@ -1,19 +1,35 @@
 @layer layout {
+  body {
+    background-color: var(--hud-bg);
+    color: var(--hud-text);
+  }
+
   .app {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--app-gap);
-    min-height: 100vh;
+    min-height: 100dvh;
     padding: var(--app-gap);
     font-family: var(--app-font);
   }
 
-  .app__stage-placeholder {
-    width: 100%;
-    max-width: 20rem;
-    /* Landscape 24 x 16 board (spec §3). */
-    aspect-ratio: var(--board-cols) / var(--board-rows);
-    border: 1px dashed currentColor;
+  .app__title {
+    letter-spacing: 0.08em;
+  }
+
+  /* The HUD and the board share this width, so the board's aspect ratio drives
+     the whole column. --board-cols / --board-rows arrive inline from App
+     (DEFAULT_RULES); there is no CSS fallback on purpose. */
+  .app__game {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--app-gap);
+    inline-size: min(
+      100%,
+      var(--stage-max-inline-size),
+      calc((100dvh - var(--app-chrome-block-size)) * var(--board-cols) / var(--board-rows))
+    );
   }
 }

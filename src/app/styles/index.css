@@ -1,8 +1,14 @@
-/* Cascade order for the whole app. Declared once, here, before anything else:
-   later layers always win, regardless of import order or selector specificity. */
+/* Cascade order for the whole app: later layers always win over earlier ones,
+   regardless of selector specificity. This statement is redundant with the
+   @imports below in dev, but the production build drops it (it restates an
+   order the imports already establish by first appearance) — so the @imports
+   below MUST stay in this same order, or the built CSS stops matching it. */
 @layer reset, tokens, layout, theme;
 
 @import './reset.css';
 @import './tokens.css';
 @import './layout.css';
+@import './stage.css';
+@import './entities.css';
+@import './hud.css';
 @import './theme.css';
