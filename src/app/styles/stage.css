@@ -92,6 +92,32 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .overlay-panel__scores {
+    display: grid;
+    gap: 0.2rem;
+    margin: 0;
+    padding: 0;
+    min-inline-size: 11rem;
+    list-style: none;
+    font-size: 0.8125rem;
+  }
+
+  .overlay-panel__score-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .overlay-panel__score-rank,
+  .overlay-panel__score-date {
+    opacity: 0.6;
+  }
+
+  .overlay-panel__score-value {
+    font-weight: 600;
+  }
+
   .overlay-panel__hint {
     margin: 0;
     font-size: 0.8125rem;

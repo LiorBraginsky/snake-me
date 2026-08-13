@@ -1,8 +1,9 @@
-import { onCleanup } from 'solid-js';
+import { createEffect, createMemo, on, onCleanup } from 'solid-js';
 import type { JSX } from 'solid-js';
 
 import { DEFAULT_RULES, createSeededRng } from '../entities/game';
 import { createGameLoop, createGameSession } from '../features/game-session';
+import { createScoreboardState } from '../features/scoreboard';
 import { applyTheme, createThemeState } from '../features/theming';
 import { createKeyboardControls } from '../shared/input';
 import { createWebStorageStore } from '../shared/storage';
@@ -26,6 +27,19 @@ export function App(): JSX.Element {
 
   onCleanup(createKeyboardControls(window, session.dispatch));
 
+  // Keyed on a memo of `status`, not on the state signal, so a tick cannot
+  // re-enter this effect — the same reason `createGameLoop` memoises status
+  // (ADR 0005). Solid flushes user effects before the browser paints, so the
+  // overlay's first frame already carries the round that just ended.
+  const status = createMemo(() => session.state().status);
+  createEffect(
+    on(status, (value) => {
+      if (value === 'game-over') {
+        scoreboard.record(session.state().score);
+      }
+    }),
+  );
+
   // One store, two versioned keys (spec §7). `window.localStorage` arrives as a
   // lazy provider because reading that property itself throws when storage is
   // blocked — the adapter catches it, the composition root does not have to.
@@ -34,6 +48,9 @@ export function App(): JSX.Element {
   // `:root` before the browser's first paint — there is no theme bootstrap in
   // main.tsx and no flash of the dark-checker default.
   const themeState = createThemeState({ store, apply: applyTheme });
+  // `Date` is read here and nowhere below: the composition root is the one place
+  // production non-determinism originates (ADR 0004).
+  const scoreboard = createScoreboardState({ store, now: () => new Date().toISOString() });
 
   return (
     <main class="app">
@@ -52,6 +69,7 @@ export function App(): JSX.Element {
           rows={DEFAULT_RULES.rows}
           boardStyle={themeState.theme().boardStyle}
           state={session.state()}
+          scores={scoreboard.entries()}
           onStart={session.start}
           onRestart={session.restart}
         />

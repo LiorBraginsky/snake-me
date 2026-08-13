@@ -8,13 +8,14 @@ Frozen reasoning lives in `docs/adr/`. Gameplay and visual truth live in
 `docs/specs/2026-08-12-snake-game-design.md`. This file is the map, not the
 territory and not the argument.
 
-- **Last synced:** chunk 04 — game stage UI
-- **State of the tree:** the game is playable in the default `dark-checker`
-  palette. `app/` composes the session, the loop and the keyboard adapter and
-  owns the CSS cascade; `widgets/game-stage`, `widgets/hud`, `features/game-session`,
-  `entities/game` and `shared/input` are live. `features/theming`,
-  `widgets/theme-picker` and `shared/storage` are still `index.ts` stubs (a
-  comment plus `export {}`).
+- **Last synced:** chunk 05 — theming + storage
+- **State of the tree:** every slice in the inventory below is `live`. `app/`
+  composes the session, the loop, the keyboard adapter, the theme state and the
+  scoreboard state, and owns the CSS cascade. The theme is applied to `:root`
+  from `App` before the first paint; the player can switch among six themes
+  through `widgets/theme-picker`, and the pick and the top-5 scoreboard both
+  persist across a reload through `shared/storage`'s `KeyValueStore`.
+  `features/scoreboard` is a new slice this chunk added.
 
 ## Layers
 
@@ -23,7 +24,7 @@ app       composition — assembles widgets, owns the session, boots the theme
   │
 widgets   composed UI blocks — one component per file
   │
-features  reactive behaviour — session, game loop, theming
+features  reactive behaviour — session, game loop, theming, scoreboard
   │
 entities  domain — the pure game core
   │
@@ -67,13 +68,18 @@ of the slice is real · `live` — complete per spec.
 
 | Module | Status | Purpose | Lands in |
 |--------|--------|---------|----------|
-| `App.tsx` | live | Composition root: owns the session (`createGameSession`), starts `createGameLoop`, binds `createKeyboardControls`, and renders `Hud` + `GameStage`. Passes `window` as both the `FrameScheduler` and the `KeyDownTarget`, and `createSeededRng(Date.now())` as the rng (ADR 0005) | 01 → 03 → 04 |
-| `main.tsx` | partial | Entry point: mounts `<App />` into `#root`, imports the stylesheet; theme bootstrap still to come | 01 → 05 |
-| `styles/` | live for chunk 04 | `index.css` declares the cascade order `@layer reset, tokens, layout, theme` once and imports `reset`, `tokens`, `layout`, `stage`, `entities`, `hud`, `theme`. `tokens.css` holds the 14 `dark-checker` defaults plus the geometry properties; `stage.css`, `entities.css` and `hud.css` each wrap their contents in `@layer layout` | 01 → 04, 05 |
+| `App.tsx` | live | Composition root: owns the session (`createGameSession`), starts `createGameLoop`, binds `createKeyboardControls`, restores and applies the theme (`createThemeState` + `applyTheme`), restores and records the scoreboard (`createScoreboardState`), and renders `Hud` + `GameStage` + `ThemePicker`. Passes `window` as both the `FrameScheduler` and the `KeyDownTarget`, `createSeededRng(Date.now())` as the rng, and `() => window.localStorage` as the storage provider (ADR 0004, 0005) | 01 → 03 → 04 → 05 |
+| `main.tsx` | live | Entry point: mounts `<App />`, imports the stylesheet. The theme bootstrap deliberately lives in `App` instead: the theme state is shared with the picker and the board, and `App`'s body runs synchronously inside `render()`, before the first paint, so there is nothing a pre-mount hook would add | 01 → 05 |
+| `styles/` | live | `index.css` declares the cascade order `@layer reset, tokens, layout, theme` once and imports `reset`, `tokens`, `layout`, `stage`, `entities`, `hud`, `theme-picker`, `theme`. `tokens.css` holds the 14 `dark-checker` defaults plus the geometry properties; `stage.css`, `entities.css`, `hud.css` and `theme-picker.css` each wrap their contents in `@layer layout`; `theme.css` wraps its contents in `@layer theme` | 01 → 04, 05 |
 
-`styles/theme.css` is deliberately **empty**: the layer exists from day one so
-the cascade order never has to change when `features/theming` starts writing
-theme tokens in chunk 05 ([ADR 0003](adr/0003-theme-model.md)).
+`styles/theme.css` holds two `[data-theme='…']` escape-hatch rules (`nokia`'s
+monochrome eyes, `neon`'s apple halo — [ADR 0006](adr/0006-theme-carries-no-components.md))
+and stays empty **of token declarations**, which is what ADR 0003's original
+sentence about this file was actually about: the layer existed from day one so
+the cascade order never had to change when `features/theming` started writing
+theme tokens in chunk 05, and it still holds none — `applyTheme` writes the 14
+tokens as an inline style on `:root`, which outranks every `@layer` regardless
+of what `theme.css` contains.
 
 **Board dimensions: one home, resolved in chunk 04.** `DEFAULT_RULES.cols` /
 `.rows` in `entities/game/rules.ts` are the only copy. They reach CSS as an
@@ -88,16 +94,17 @@ collapses visibly instead of quietly rendering a stale copy of 24×16.
 
 | Slice | Status | Contents | Lands in |
 |-------|--------|----------|----------|
-| `game-stage/` | live | `GameStage` (layer stack + geometry root: sets `--board-cols` / `--board-rows`, is the container-query container), `BoardLayer` (z0, one gradient element, reads no accessor), `EntityLayer` (z1, promoted compositor layer), `SnakeView`, `SnakeSegment`, `ItemView`, `AppleSprite`, `BoltSprite`, `StartOverlay`, `GameOverOverlay`. **Public API: `GameStage` only** (+ `GameStageProps`, `BoardStyle`) | 04 |
+| `game-stage/` | live | `GameStage` (layer stack + geometry root: sets `--board-cols` / `--board-rows`, is the container-query container), `BoardLayer` (z0, one gradient element; its only prop is the active theme's `boardStyle`), `EntityLayer` (z1, promoted compositor layer), `SnakeView`, `SnakeSegment`, `ItemView`, `AppleSprite`, `BoltSprite`, `StartOverlay`, `GameOverOverlay` (now also renders the persisted top-5 scoreboard, via a `scores` prop threaded from `App`). **Public API: `GameStage` only** (+ `GameStageProps`) — `BoardStyle` moved to `features/theming` in chunk 05, so it is no longer re-exported here | 04, 05 |
 | `hud/` | live | `Hud`, `ScoreCounter`, `StatusBadge` + `statusBadgeVariant.ts` (`statusBadgeVariant` — the badge precedence, the one logic-tested function in `widgets`). **Public API: `Hud` only** (+ `HudProps`) | 04 |
-| `theme-picker/` | stub | `ThemePicker` | 05 |
+| `theme-picker/` | live | `ThemePicker` (enumerates `THEME_LIST`, one `role="group"` of buttons), `ThemeSwatch` (one theme: a token-derived preview plus the Space `stopPropagation`, ADR 0005 § Amendment). **Public API: `ThemePicker` only** (+ `ThemePickerProps`) | 05 |
 
 ### `features/` — reactive behaviour
 
 | Slice | Status | Contents | Lands in |
 |-------|--------|----------|----------|
 | `game-session/` | live | `createGameSession` (engine state in one signal, `dispatch`, start / togglePause / restart / tick), `createGameLoop` (rAF + accumulator, `FrameScheduler` port) | 03 |
-| `theming/` | stub | Theme registry (6 themes), `applyTheme`, `createThemeState` | 05 |
+| `theming/` | live | `types.ts` (`ThemeId`, `BoardStyle`, `ThemeTokens`, `Theme`), `themes.ts` (the six-theme registry — `THEMES` private, `THEME_LIST` public, `themeById` internal), `applyTheme` (the only module that touches `document`), `createThemeState` (`store` + `apply` injected, one signal). **Public API:** `Theme`, `ThemeId`, `BoardStyle`, `ThemeTokens`, `THEME_LIST`, `applyTheme`, `createThemeState` (+ `ThemeState`, `ThemeStateOptions`) | 05 |
+| `scoreboard/` | live | `createScoreboardState` (`store` + `now` injected, one signal; ordering and the top-five cut are delegated to `entities/game`'s `addScore` — this slice never re-implements ranking). **Public API:** `createScoreboardState` (+ `ScoreboardState`, `ScoreboardStateOptions`) | 05 |
 
 ### `entities/` — domain
 
@@ -121,15 +128,25 @@ import against.
 | Slice | Status | Contents | Lands in |
 |-------|--------|----------|----------|
 | `input/` | live | `createKeyboardControls`, `ControlSignal`, `KeyDownTarget` port; imports nothing at all | 03 |
-| `storage/` | stub | `KeyValueStore` port + `localStorage` adapter, versioned keys | 05 |
+| `storage/` | live | `KeyValueStore` port (`get(key, decode)` / `set`), `createWebStorageStore` over an injected `WebStorage` provider; keys `snake-me:theme:v1`, `snake-me:scoreboard:v1` live with their consumers, not in `shared` | 05 |
 
 ## Data flow
 
 ```
 keyboard (shared/input) ─ControlSignal─▶ game-session ─commands─▶ engine
 engine state ─signals─▶ widgets (EntityLayer diffs cells; BoardLayer never re-renders)
-theme state ─CSS custom properties─▶ stage & HUD
+theme state ─applyTheme─▶ :root custom properties + data-theme
+round result ─addScore─▶ scoreboard ─KeyValueStore─▶ localStorage
 ```
+
+The adapter listens on `window`, so a widget that needs one of the keys it
+claims takes it back by calling `stopPropagation()` — local beats global, and
+the port stays three members wide (`key`, `repeat`, `preventDefault`; ADR 0005
+§ Amendment). `ThemeSwatch` is the one call site today: its `onKeyDown` calls
+`event.stopPropagation()` for `' '` only, so the adapter's Space (start / play
+again) never sees the keydown while the swatch's own native button activation
+still fires — arrows have no default action on a `<button>`, so a focused
+swatch still steers the snake.
 
 The engine is a pure reducer: `createInitialState`, `start`, `togglePause`,
 `turn`, `tick`, `restart`, `tickIntervalMs` (spec §4). It is driven by
@@ -153,20 +170,23 @@ Theme tokens cross into CSS exactly once, in `applyTheme`; components read
 
 ## CSS custom property contract
 
-Two disjoint namespaces live in `app/styles`. Chunk 05 owns the first and must
-never write the second.
+Three disjoint namespaces live in `app/styles`: theme tokens (`features/theming`
+owns these), geometry (chunk 04 owns these), and the swatch preview
+(`ThemeSwatch` owns these). None of the three may write into either of the
+other two.
 
 ### Theme tokens — 14, one per `ThemeTokens` field
 
-The property name is the exact kebab-case of the field name, so chunk 05's
-`applyTheme` is a mechanical camelCase→kebab transform with no lookup table.
-Defaults for `dark-checker` sit on `:root` in `tokens.css` (`@layer tokens`);
-`applyTheme` writes the same names inline on the game root, and an inline style
-outranks every `@layer` — which is why the defaults belong in the tokens layer
-and `theme.css` can stay empty (ADR 0003).
+The property name is the exact kebab-case of the field name, so `applyTheme`
+is a mechanical camelCase→kebab transform with no lookup table (this contract
+is now live, not pending — `applyTheme` writes it on every load and every
+selection). Defaults for `dark-checker` sit on `:root` in `tokens.css` (`@layer
+tokens`); `applyTheme` writes the same names inline on the game root, and an
+inline style outranks every `@layer` — which is why the defaults belong in the
+tokens layer and `theme.css` can carry zero token declarations (ADR 0003).
 
 **The game root is `document.documentElement` (`:root`), not `#root` or any
-other mount node.** Chunk 05's `applyTheme` writes the 14 properties and
+other mount node.** `applyTheme` writes the 14 properties and
 `data-theme` there. That is load-bearing, not a stylistic choice: `body` paints
 `background-color: var(--hud-bg)` (`layout.css`), and every candidate mount
 node (`#root`, `.app`, `.app__game`) is a *descendant* of `body`. Custom
@@ -207,7 +227,7 @@ accepts by name.
 | `--segment-gap`, `--segment-radius`, `--snake-shadow-depth` | `.stage__layer` | fractions of `--cell-size` |
 | `--head-rotation` | `.snake__face[data-direction]` | `0deg` / `90deg` / `180deg` / `270deg` |
 | `--x`, `--y` | inline style per segment and item | grid coordinates, unitless, multiplied by `--cell-size` inside `transform` |
-| `--app-font`, `--app-gap`, `--app-chrome-block-size`, `--stage-max-inline-size`, `--board-wall-width` | `:root` in `tokens.css` | page and stage sizing |
+| `--app-font`, `--app-gap`, `--app-chrome-block-size`, `--stage-max-inline-size`, `--board-wall-width` | `:root` in `tokens.css` | page and stage sizing — `--app-chrome-block-size` is `13rem` as of chunk 05 (title + HUD + theme picker + gaps) |
 
 Structure that is data rather than colour travels as attributes:
 `data-board-style` (`checker` \| `solid` — ADR 0003's board branch) and
@@ -219,19 +239,40 @@ Structure that is data rather than colour travels as attributes:
 is why the wall is a fixed `--board-wall-width` ring and why every cell-derived
 property is declared on `.stage__layer`, one level in.
 
+### Swatch preview — 3, a third namespace owned by `ThemeSwatch`
+
+| Property | Declared by | Value |
+|---|---|---|
+| `--swatch-board` | inline style per swatch in `ThemeSwatch` | that theme's `tokens.boardCellA` |
+| `--swatch-snake` | inline style per swatch in `ThemeSwatch` | that theme's `tokens.snakeBody` |
+| `--swatch-item` | inline style per swatch in `ThemeSwatch` | that theme's `tokens.itemFood` |
+
+Disjoint from the frozen 14 and from the geometry names above on purpose
+(ADR 0006). `ThemeSwatch` is the one place in the tree that reads token
+*values* in JS instead of consuming `var(--…)`: the cascade only ever carries
+the **active** theme, so previewing the other five themes cannot come from a
+custom property. Bounded to three tokens, never the frozen fourteen, never a
+geometry property.
+
 **The only literal colours in the tree** are `#fff` (eye) and `#101418` (pupil)
 in `entities.css`: `ThemeTokens` has no eye token and spec §5 fixes the eyes as
-white. `#000` / `#fff` otherwise appear only as `color-mix()` anchors, never as
-paint. A monochrome theme that needs different eyes uses ADR 0003's `data-theme`
-escape hatch.
+white everywhere else. `#000` / `#fff` otherwise appear only as `color-mix()`
+anchors, never as paint. `nokia` needs different eyes — a hole in `--board-bg`
+with an ink pupil in `--snake-head` — and gets them through ADR 0003's
+`data-theme` escape hatch rather than a 15th token, as ADR 0006 formalises.
 
 ### Why a tick cannot repaint the board
 
 Three mechanisms, in the order they stop work happening (spec §5, ADR 0001):
 
-1. `BoardLayer` reads no accessor — its only prop chain ends at a literal in
-   `App` — so Solid never re-runs it, and the checkerboard is one gradient
-   element rather than 384 nodes. There is nothing for a tick to invalidate.
+1. `BoardLayer`'s only prop is the active theme's `boardStyle`, so `GameState`
+   never reaches it and a tick has nothing to invalidate — Solid re-runs a
+   component only when a signal it reads changes, and this one reads none of
+   the session's. The one dynamic binding left is the `data-board-style`
+   attribute, and it changes only when the player picks a theme through
+   `ThemePicker`, never on a tick. The checkerboard is still one gradient
+   element rather than 384 nodes; the invariant survives chunk 05 even though
+   `BoardLayer` is no longer literally propless.
 2. The engine keeps every surviving segment's `Point` object identity across a
    tick, so a reference-keyed `<For>` over `snake.slice(1, -1)` inserts one row
    and removes one row; the interior rows are never touched. Head and tail are
@@ -260,27 +301,29 @@ and also carries `contain: layout style inline-size` via
 `container-type: inline-size` — a rounded clip on an ancestor is a classic
 reason Chrome masks or declines a promotion.
 
-### Hand-off to chunk 05
+### Resolved in chunk 05
 
-- **Sprite components have no permanent home yet.** Spec §6 / ADR 0003 put a
-  `SpriteSet` on the `Theme` object in `features/theming`, but a feature may not
-  import a widget, so chunk 04's only legal home for `AppleSprite` /
-  `BoltSprite` was inside `widgets/game-stage`. Chunk 05 decides: move the base
-  set down into `features/theming` and pass it into `GameStage` as a prop, or
-  keep the base set in the widget and let a theme carry overrides only.
-- **`BoardStyle` is declared in `BoardLayer.tsx` for the same reason.** When
-  `Theme.boardStyle` lands, the canonical union moves to `features/theming` and
-  the widget imports it downward.
-- **`applyTheme` writes the 14 names above and nothing else.** Writing a
-  geometry property from a theme would put a gameplay or layout number in
-  `themes.ts`, which `CLAUDE.md` forbids.
-- **Eye and pupil colours need a `data-theme` rule** if `nokia` or `neon` wants
-  them monochrome — there is no token to reach for.
-- **`applyTheme` writes to `document.documentElement` (`:root`), never to a
-  mount node further down.** `body` paints `background-color: var(--hud-bg)`
-  and inherits nothing from a descendant — writing lower would leave the page
-  background stuck on the `dark-checker` default while the board and HUD
-  switched themes underneath it.
+Every question the previous "Hand-off to chunk 05" section left open is now
+closed:
+
+- **Sprites stay where chunk 04 put them, permanently.** `Theme` carries no
+  `SpriteSet` and never will: the one detailed SVG set lives in
+  `widgets/game-stage` and recolours through the 14 `ThemeTokens` fields, so
+  every theme already has its own apple and its own bolt with zero component
+  threading. A theme that needs a different *treatment* ships a `[data-theme]`
+  rule in `app/styles/theme.css` instead — see
+  [ADR 0006](adr/0006-theme-carries-no-components.md), which narrows ADR 0003.
+- **`BoardStyle` moved.** The canonical union now lives in
+  `features/theming/types.ts`; `widgets/game-stage` imports it downward, and
+  `game-stage`'s public API no longer re-exports it.
+- **`applyTheme` writes the 14 names and `data-theme`, nothing else.** Geometry
+  properties stay chunk 04's, per the contract above.
+- **Eye and pupil colours use the `data-theme` escape hatch, not a 15th
+  token.** `nokia`'s eyes and `neon`'s apple halo are the two live examples in
+  `theme.css` (ADR 0006).
+- **`applyTheme` writes to `document.documentElement` (`:root`)**, called
+  synchronously from `App`, before the first paint — confirmed, not merely
+  planned: there is no separate bootstrap in `main.tsx`.
 
 ## Enforcement
 
@@ -298,7 +341,7 @@ it stops being a rule.
 | Theme token completeness | `pnpm typecheck` | `ThemeTokens` is a closed required record |
 | TS strict across the repo | `pnpm typecheck` | `tsc --noEmit`, `strict: true` |
 | Engine determinism (seeded RNG, golden tests) | `pnpm test` | vitest, environment `node` — and `node` is the **final** state, not a staging one: the project tests logic only (spec §8), so jsdom is never added |
-| Session and engine are headless (no ambient DOM, clock, scheduling or randomness) | `pnpm lint` | Two rules, scoped to `src/entities/**` and `src/features/game-session/**`, tests excluded. `no-restricted-globals` bans direct references to `window`, `document`, `localStorage`, `requestAnimationFrame`, `cancelAnimationFrame`, `performance`, `Date`, `setTimeout`, `setInterval`, `queueMicrotask`, `self`, `navigator`, `crypto` and `globalThis` — it flags every reference eslint-scope resolves to that identifier, so a type-cast wrapper (`(globalThis as unknown as { window: Window }).window`) does not launder it past the rule. `no-restricted-properties` separately bans the *property* `Math.random` — `Math.max` / `.floor` / `.round` / `.imul` stay legal — but only when `Math` is a bare identifier: a cast on `Math` itself (`(Math as unknown as { random(): number }).random()`) is NOT caught by either rule; no test in this codebase relies on that gap being closed. `features/theming` is deliberately out of scope ([ADR 0003](adr/0003-theme-model.md)), and so is `src/shared/**` — `shared/storage` is specified as a `localStorage` adapter (chunk 05) ([ADR 0005](adr/0005-headless-session-ports.md)) |
+| Session, engine, scoreboard and `shared/**` are headless (no ambient DOM, clock, scheduling or randomness) | `pnpm lint` | Two rules, scoped as of chunk 05 to `src/entities/**`, `src/features/game-session/**`, `src/features/scoreboard/**` and `src/shared/**`, tests excluded. `no-restricted-globals` bans direct references to `window`, `document`, `localStorage`, `requestAnimationFrame`, `cancelAnimationFrame`, `performance`, `Date`, `setTimeout`, `setInterval`, `queueMicrotask`, `self`, `navigator`, `crypto` and `globalThis` — it flags every reference eslint-scope resolves to that identifier, so a type-cast wrapper (`(globalThis as unknown as { window: Window }).window`) does not launder it past the rule. `no-restricted-properties` separately bans the *property* `Math.random` — `Math.max` / `.floor` / `.round` / `.imul` stay legal — but only when `Math` is a bare identifier: a cast on `Math` itself (`(Math as unknown as { random(): number }).random()`) is NOT caught by either rule; no test in this codebase relies on that gap being closed. `features/theming` is deliberately out of scope ([ADR 0003](adr/0003-theme-model.md)): writing theme tokens onto `document` is that slice's job. `src/shared/**` joined the glob in chunk 05 **with no carve-out**: `shared/storage`'s `createWebStorageStore` takes the storage object as an injected provider (`() => window.localStorage`) rather than naming `localStorage` itself, so nothing under `shared/**` needs an ambient global; `features/scoreboard` joined for the same reason `game-session` is in the glob — the ISO date is an injected `now: () => string` ([ADR 0005 § Amendment](adr/0005-headless-session-ports.md)). The widened rule was re-proven with a deliberate violation before merge: a probe `localStorage.getItem(...)` in `shared/storage/keyValueStore.ts` produced `'localStorage' is restricted from being used. Headless by contract: take a port (ADR 0005)`, and the same probe pattern with `new Date().toISOString()` in `features/theming/applyTheme.ts` produced no `no-restricted-globals` error at all (only an unrelated unused-variable error) — proving both the rule's reach over `shared/**` and `features/theming`'s exclusion boundary in the same run |
 | Behaviour end to end | `pnpm test:e2e` | Playwright smoke — a stub script until chunk 06, already wired into CI so chunk 06 replaces a script body rather than the workflow |
 | Formatting | `pnpm lint` | `prettier --check .` |
 
@@ -475,3 +518,4 @@ lint error, and the answer is to find the layer it belongs in.
 | [0003](adr/0003-theme-model.md) | Typed theme registry + CSS custom properties | proposed |
 | [0004](adr/0004-engine-api.md) | Engine API: injected `Rules` and `Rng`, no-op transitions return their input, board-full ends the round | proposed |
 | [0005](adr/0005-headless-session-ports.md) | Headless session: time and input as ports the composition root supplies | proposed |
+| [0006](adr/0006-theme-carries-no-components.md) | Theme carries palette and board style, not components | proposed |

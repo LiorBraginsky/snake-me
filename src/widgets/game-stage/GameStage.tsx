@@ -1,7 +1,7 @@
 import { Show } from 'solid-js';
 import type { JSX } from 'solid-js';
 
-import type { GameState } from '../../entities/game';
+import type { GameState, ScoreEntry } from '../../entities/game';
 import type { BoardStyle } from '../../features/theming';
 import { BoardLayer } from './BoardLayer';
 import { EntityLayer } from './EntityLayer';
@@ -15,6 +15,7 @@ export interface GameStageProps {
   readonly rows: number;
   readonly boardStyle: BoardStyle;
   readonly state: GameState;
+  readonly scores: readonly ScoreEntry[];
   readonly onStart: () => void;
   readonly onRestart: () => void;
 }
@@ -39,7 +40,11 @@ export function GameStage(props: GameStageProps): JSX.Element {
         <StartOverlay onStart={props.onStart} />
       </Show>
       <Show when={props.state.status === 'game-over'}>
-        <GameOverOverlay score={props.state.score} onRestart={props.onRestart} />
+        <GameOverOverlay
+          score={props.state.score}
+          scores={props.scores}
+          onRestart={props.onRestart}
+        />
       </Show>
     </div>
   );

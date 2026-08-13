@@ -94,12 +94,13 @@ src/
 ├── features/
 │   ├── game-session/             #   createGameSession (signals, start/pause/restart,
 │   │                             #   input binding), createGameLoop (rAF + accumulator)
+│   ├── scoreboard/               #   createScoreboardState (top-5, persisted)
 │   └── theming/                  #   themes registry, applyTheme, createThemeState
 ├── entities/
 │   └── game/                     #   types, engine (pure reducer), rules, rng port
 └── shared/
     ├── input/                    #   keyboard → ControlSignal (no game knowledge)
-    └── storage/                  #   KeyValueStore port + localStorage adapter
+    └── storage/                  #   KeyValueStore port + Web Storage adapter (injected)
 ```
 
 **Invariants (all lint-enforced, see §8):**
