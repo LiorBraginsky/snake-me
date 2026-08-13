@@ -141,8 +141,20 @@ export default tseslint.config(
   // this glob: writing theme tokens onto the document is exactly its job
   // (ADR 0003). Tests are exempt for the same reason they are exempt from the
   // boundaries rules, and because the compile-time `window` proofs live there.
+  //
+  // `src/shared/**` is IN the glob as of chunk 05. ADR 0005 kept it out only
+  // because `shared/storage` was specified as a `localStorage` adapter; the
+  // adapter now takes the storage object as an injected provider, so no file
+  // under `src/shared/**` needs an ambient global and no carve-out is needed.
+  // `features/scoreboard` joins for the same reason `game-session` is here: it
+  // must take the ISO date as an injected value, never read the clock.
   {
-    files: ['src/entities/**/*.{ts,tsx}', 'src/features/game-session/**/*.{ts,tsx}'],
+    files: [
+      'src/entities/**/*.{ts,tsx}',
+      'src/features/game-session/**/*.{ts,tsx}',
+      'src/features/scoreboard/**/*.{ts,tsx}',
+      'src/shared/**/*.{ts,tsx}',
+    ],
     ignores: ['**/*.test.{ts,tsx}'],
     rules: {
       'no-restricted-globals': [
