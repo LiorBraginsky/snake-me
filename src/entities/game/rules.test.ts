@@ -9,7 +9,6 @@ describe('DEFAULT_RULES', () => {
   });
 
   it('derives the boost duration from the boosted interval, as whole ticks', () => {
-    // 5000 ms / (150 ms / 1.6) = 53.33 ticks -> 53 (spec §3).
     expect(DEFAULT_RULES.boostDurationTicks).toBe(53);
     expect(Number.isInteger(DEFAULT_RULES.boostDurationTicks)).toBe(true);
   });

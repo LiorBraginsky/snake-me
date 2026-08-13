@@ -9,9 +9,7 @@ import { GameOverOverlay } from './GameOverOverlay';
 import { StartOverlay } from './StartOverlay';
 
 export interface GameStageProps {
-  /** Board width in cells. The composition root passes `DEFAULT_RULES.cols`. */
   readonly cols: number;
-  /** Board height in cells. The composition root passes `DEFAULT_RULES.rows`. */
   readonly rows: number;
   readonly boardStyle: BoardStyle;
   readonly state: GameState;
@@ -20,12 +18,6 @@ export interface GameStageProps {
   readonly onRestart: () => void;
 }
 
-/**
- * The layer stack, and the geometry root: this element is the container query
- * container the whole stage measures itself against, and the one place the board
- * dimensions cross from `entities/game/rules.ts` into CSS. `--cell-size` is
- * derived from these two in `stage.css` — nothing here measures the DOM.
- */
 export function GameStage(props: GameStageProps): JSX.Element {
   return (
     <div class="stage" style={{ '--board-cols': props.cols, '--board-rows': props.rows }}>

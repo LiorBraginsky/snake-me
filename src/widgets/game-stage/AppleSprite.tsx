@@ -1,12 +1,5 @@
 import type { JSX } from 'solid-js';
 
-/**
- * The apple (spec §5): red body with a dark outline, a highlight, a stem and a
- * leaf. The sprite carries shape only — every fill arrives from a theme token or
- * a colour mixed from one, through the classes styled in
- * `app/styles/entities.css`. `fill="var(--item-food)"` as a presentation
- * attribute would not be substituted by browsers, which is why paint is CSS.
- */
 export function AppleSprite(): JSX.Element {
   return (
     <svg class="item__sprite sprite-apple" viewBox="0 0 24 24" aria-hidden="true">

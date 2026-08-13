@@ -4,17 +4,8 @@ import { createKeyboardControls } from './keyboard';
 import type { ControlDirection, ControlSignal, KeyDownEvent, KeyDownTarget } from './keyboard';
 import type { Direction } from '../../entities/game';
 
-/** Compile-time proof. Never executed — `window` does not exist under vitest's node env. */
 export const _windowIsAKeyDownTarget = (): KeyDownTarget => window;
 
-/**
- * Compile-time proofs that the two direction unions stay identical. Unlike a
- * `satisfies` check against a literal array — which is contextually typed, so
- * the array narrows to exactly what is written and never notices either union
- * growing — an identity function's parameter is the FULL union type, so a
- * fifth member added to either `Direction` or `ControlDirection` makes the
- * corresponding return type no longer accept it, and `pnpm typecheck` fails.
- */
 export const _engineDirectionsAreControlDirections = (d: Direction): ControlDirection => d;
 export const _controlDirectionsAreEngineDirections = (d: ControlDirection): Direction => d;
 
@@ -29,7 +20,6 @@ function fakeTarget() {
       listeners.delete(listener);
     },
     listenerCount: (): number => listeners.size,
-    /** Returns how many times the adapter claimed the key. */
     press(key: string, repeat = false): number {
       let prevented = 0;
       const event: KeyDownEvent = {

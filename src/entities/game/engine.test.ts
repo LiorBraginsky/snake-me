@@ -15,14 +15,8 @@ import { DEFAULT_RULES } from './rules';
 import type { Rules } from './rules';
 import type { GameState } from './types';
 
-/** A 5x5 board keeps spawn and wall arithmetic checkable by hand. */
 const TINY: Rules = { ...DEFAULT_RULES, cols: 5, rows: 5 };
 
-/**
- * Returns the scripted draws, then throws. Throwing is the point: scripting N
- * draws asserts the engine makes exactly N, which is how the tick phase order
- * (plan D13) stays pinned.
- */
 function stubRng(values: readonly number[]): Rng & { calls: () => number } {
   let index = 0;
 
@@ -40,11 +34,6 @@ function stubRng(values: readonly number[]): Rng & { calls: () => number } {
   };
 }
 
-/**
- * A running round on the 5x5 board: snake heading right along y = 2 from
- * (2,2), apple parked at (4,0) where the default path never reaches it, so a
- * plain tick consumes no draws.
- */
 function running(overrides: Partial<GameState> = {}): GameState {
   const base: GameState = {
     status: 'running',
@@ -93,10 +82,6 @@ describe('lifecycle', () => {
       at: { x: 0, y: 0 },
     });
 
-    // A draw that discriminates: the snake's three cells are excluded, so the
-    // free list is 381 long and floor(0.53 * 381) = 201 -> (9,8). Spread over
-    // all 384 cells the same draw would give (11,8) — a snake segment — so this
-    // is what pins that the apple never spawns under the snake.
     expect(createInitialState(DEFAULT_RULES, stubRng([0.53])).food).toEqual({
       kind: 'food',
       at: { x: 9, y: 8 },
@@ -112,8 +97,6 @@ describe('lifecycle', () => {
     expect(started.status).toBe('running');
     expect(start(started)).toBe(started);
     expect(start(paused)).toBe(paused);
-    // A finished round must never resume: `start` here would hand back the dead
-    // snake with its score intact instead of requiring a `restart`.
     expect(start(over)).toBe(over);
   });
 
@@ -191,14 +174,10 @@ describe('turn', () => {
     const state = running();
 
     expect(turn(state, TINY, 'left').queue).toEqual([]);
-    // By reference, not a clone: chunk 03 feeds this into a Solid signal, so a
-    // fresh object would re-render the board on every repeat of a held key.
     expect(turn(state, TINY, 'left')).toBe(state);
   });
 
   it('rejects a 180° turn against the last queued direction', () => {
-    // right -> up is legal, but up -> down would reverse into the neck on the
-    // following tick, so it must be rejected while `up` is still queued.
     const state = turn(running(), TINY, 'up');
 
     expect(turn(state, TINY, 'down').queue).toEqual(['up']);
@@ -226,7 +205,6 @@ describe('tickIntervalMs', () => {
   });
 
   it('is the boosted interval while the effect lasts', () => {
-    // 150 / 1.6 is 93.749999... in binary floating point, hence toBeCloseTo.
     expect(tickIntervalMs(running({ boostTicksRemaining: 1 }), DEFAULT_RULES)).toBeCloseTo(93.75);
   });
 });
@@ -267,8 +245,6 @@ describe('tick — collisions', () => {
         { x: 3, y: 2 },
         { x: 2, y: 2 },
       ],
-      // Both survive the death tick untouched (D12): the queue head is read for
-      // the move but not consumed, and the boost counter does not tick down.
       queue: ['right'],
       boostTicksRemaining: 7,
     });
@@ -277,8 +253,6 @@ describe('tick — collisions', () => {
   });
 
   it('ends the round when the head leaves the board through the top', () => {
-    // y = 0 is the top row, so one step up is off the board. Covered on its own
-    // because `y < rows` and `y >= 0` are separate halves of the wall check.
     const state = running({
       snake: [
         { x: 2, y: 0 },
@@ -292,8 +266,6 @@ describe('tick — collisions', () => {
   });
 
   it('ends the round when the head runs into its own body', () => {
-    // Built directly: `turn` can never produce this, which is the point — the
-    // queued reversal walks the head straight back into the neck at (2,1).
     const coiled = running({
       snake: [
         { x: 1, y: 1 },
@@ -335,7 +307,6 @@ describe('tick — collisions', () => {
 describe('tick — apple', () => {
   it('grows by one segment and scores the apple', () => {
     const state = running({ food: { kind: 'food', at: { x: 3, y: 2 } } });
-    // Draws: the new apple's cell, then the boost roll (0.9 fails).
     const next = tick(state, TINY, stubRng([0, 0.9]));
 
     expect(next.snake).toEqual([
@@ -358,8 +329,6 @@ describe('tick — apple', () => {
       food: { kind: 'food', at: { x: 4, y: 2 } },
       boost: { kind: 'boost', at: { x: 0, y: 0 }, ttlTicks: 5 },
     });
-    // Snake becomes (4,2),(3,2),(2,2),(1,2) and the boost still holds (0,0),
-    // so the first free cell in row-major order is (1,0).
     const next = tick(state, TINY, stubRng([0]));
 
     expect(next.food).toEqual({ kind: 'food', at: { x: 1, y: 0 } });
@@ -375,8 +344,6 @@ describe('tick — apple', () => {
       food: { kind: 'food', at: { x: 4, y: 2 } },
       boost: { kind: 'boost', at: { x: 0, y: 0 }, ttlTicks: 5 },
     });
-    // The five cells that are taken once the tick resolves: the grown snake
-    // plus the boost, which still holds (0,0).
     const occupied = [
       { x: 4, y: 2 },
       { x: 3, y: 2 },
@@ -429,7 +396,6 @@ describe('tick — apple', () => {
 describe('tick — boost', () => {
   it('spawns a boost on a free cell when the roll succeeds', () => {
     const state = running({ food: { kind: 'food', at: { x: 3, y: 2 } } });
-    // Draws: apple cell, roll (0.19 < 0.2), boost cell.
     const next = tick(state, TINY, stubRng([0, 0.19, 0]));
 
     expect(next.food).toEqual({ kind: 'food', at: { x: 0, y: 0 } });
@@ -527,12 +493,6 @@ describe('determinism', () => {
   });
 
   it('pins a seeded round that spends four draws, as golden literals', () => {
-    // Seed 408 is chosen because its whole RNG budget is observable: the first
-    // apple lands at (15,8), three cells ahead of the starting head, so tick 3
-    // eats it and spends draw 2 on the respawn, draw 3 on a boost roll that
-    // succeeds and draw 4 on the boost's cell. The literals below therefore pin
-    // the PRNG's actual output, not just that the engine is a pure function of
-    // its inputs — swap mulberry32 for another generator and this test fails.
     const play = (): GameState => {
       const rng = createSeededRng(408);
       let state = start(createInitialState(DEFAULT_RULES, rng));

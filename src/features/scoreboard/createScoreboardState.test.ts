@@ -73,18 +73,14 @@ describe('createScoreboardState', () => {
   });
 
   it('drops entries of the wrong shape and re-ranks what is left', () => {
-    // Hand-written JSON, not `JSON.stringify`: `1e999` is a valid JSON number
-    // literal that overflows to `Infinity` once parsed — `JSON.stringify`
-    // could never produce it from a JS value (it serialises `Infinity` to
-    // `null`), so the only way to feed it to the decoder is as raw text.
     const stored =
       '[' +
       '{"score":10,"date":"2026-08-13T01:00:00.000Z"},' +
       '{"score":"high","date":"2026-08-13T02:00:00.000Z"},' +
       '{"date":"2026-08-13T03:00:00.000Z"},' +
-      '{"score":50},' + // no date at all
-      '{"score":50,"date":42},' + // date present, but not a string
-      '{"score":1e999,"date":"2026-08-13T05:00:00.000Z"},' + // valid JSON, parses to Infinity
+      '{"score":50},' +
+      '{"score":50,"date":42},' +
+      '{"score":1e999,"date":"2026-08-13T05:00:00.000Z"},' +
       '{"score":80,"date":"2026-08-13T04:00:00.000Z"}' +
       ']';
 
@@ -125,19 +121,9 @@ describe('createScoreboardState', () => {
     const { state } = harness();
     let runs = 0;
 
-    // `dispose` is captured from inside the root and called AFTER `createRoot`
-    // returns, not before: the initial run of a `createEffect` is queued while
-    // the root's callback is still executing and only flushed once that
-    // callback returns, so disposing inside the callback (before returning)
-    // would tear the root down before the effect ever got to run at all.
     const dispose = createRoot((disposeRoot) => {
       createEffect(() => {
         runs += 1;
-        // Guards the test process, not the assertion: if `record` ever reads
-        // `entries` in a tracked way again, its own `setEntries` re-triggers
-        // this effect, which calls `record` again, which writes again — a
-        // runaway with no guard at all. The assertion below is `runs` staying
-        // at 1; this cap only stops the run from being literally infinite.
         if (runs > 20) {
           return;
         }
