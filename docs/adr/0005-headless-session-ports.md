@@ -212,6 +212,79 @@ questions in chunk 04's review:**
   tests to logic only, never render or markup, so there is nothing a DOM would
   let this chunk assert that a plain object fake does not already cover.
 
+## Amendment — chunk 05 (2026-08-13)
+
+Two decisions this ADR left open are now closed.
+
+**The glob reaches `src/shared/**`.** The reason it stopped at
+`features/game-session` was `shared/storage`'s specified `localStorage`
+adapter. That adapter instead takes the storage object as an injected provider
+— `createWebStorageStore(() => window.localStorage)`, the same shape as
+`createKeyboardControls(window, …)` — so nothing under `src/shared/**` names an
+ambient global and the glob widens with no carve-out. `src/features/scoreboard`
+joins the glob for the same reason `game-session` is in it: the ISO date is an
+injected `now: () => string`, never a `Date` read. `features/theming` stays out
+(ADR 0003: writing tokens onto the document is its job). A carve-out variant —
+widening plus a per-file exemption for the adapter — was rejected: exempting a
+file from `no-restricted-globals` unguards its `document`, `Date` and `crypto`
+access too, so it trades one hole for a smaller one instead of closing it. The
+widened rule was re-proven with a deliberate violation before merge.
+
+**`KeyDownEvent` was deliberately NOT widened with `target`.** Chunk 03's review
+flagged that the adapter `preventDefault()`s every key it owns, so a widget that
+needs one of those keys never sees it. The fix ships in the widget, not the
+port: `ThemePicker`'s swatches call `event.stopPropagation()` for Space (the one
+key a `<button>` and the adapter both want — arrows have no default action on a
+button). The adapter listens on `window` and Solid delegates `keydown` at
+`document`, so any handler between the target and `window` wins; that is the
+DOM's own "this element owns this key" mechanism, and it costs the port nothing.
+Adding `target` would have cost the port a lot: `KeyboardEvent.target` is
+`EventTarget | null`, which structurally has no `tagName`, so a
+`target: { tagName: string } | null` member makes `KeyboardEvent` and
+`KeyDownEvent` incompatible in both directions and
+`_windowIsAKeyDownTarget` stops compiling. The only proof-preserving typing is
+`target: unknown` plus a runtime shape guard inside a slice whose contract is
+"imports nothing" — and the guard needs two tiers to be correct (every key for
+`INPUT`/`TEXTAREA`/`SELECT`/contenteditable, Space only for `BUTTON`/`A`),
+because a focused button must keep steering the snake. Revisit when the tree
+actually grows a text input or a `<select>`; until then this is a predicate with
+no caller.
+
+**Correction (chunk 05 fix round):** the mechanism above is described slightly
+wrong in both this ADR and in `ThemeSwatch.tsx`'s original comment.
+`onKeyDown`'s handler does not run "on the button" as a literal DOM listener —
+Solid registers one delegated listener at `document` and synthesises the walk
+from `event.target` upward, calling each JSX `onKeyDown` prop it passes in
+turn. The conclusion is unaffected (that walk still finishes above the button
+and below both `document`'s delegated listener and `window`, so
+`stopPropagation()` there still wins before the keyboard adapter sees the
+event), but the correct wording exposes a real fragility worth recording:
+`stopPropagation()` does **not** stop other listeners on the *same* node — if
+`createKeyboardControls` were ever attached to `document` instead of `window`,
+Solid's delegated listener and the adapter's listener would be two handlers on
+the same node, and this whole convention would silently stop working with no
+lint rule or type error to catch it (`docs/architecture.md` § Enforcement,
+"Not yet executable", carries this as a lint-rule candidate: the keyboard
+adapter's target stays `window`).
+
+**Also fixed, same review round:** a mouse click on a swatch left it focused,
+so a subsequent Space press re-activated the swatch (native button behaviour)
+instead of reaching the adapter's global "start / play again" binding —
+making `GameOverOverlay`'s "Space plays again too" text false until focus
+moved elsewhere. `ThemeSwatch`'s `onClick` now blurs the button, but only when
+`event.detail > 0` (a real pointer click reports a click count of 1 or more; a
+keyboard-synthesised activation of a button reports `0`). A keyboard user who
+just picked a theme with Enter or Space keeps focus on the swatch — losing it
+would be a second, needless behaviour change beyond the actual bug. Arrows
+still steer the snake while a swatch holds focus for an unrelated reason:
+`onKeyDown`'s handler above checks `event.key === ' '` and does nothing for
+any other key, arrows included, so it never calls `stopPropagation()` for
+them and they reach the adapter untouched. Keeping keyboard focus on the
+swatch is acceptable on its own terms — a keyboard user has a visible
+`:focus-visible` ring, so a swatch holding Space (and consuming that one key)
+is not surprising, whereas a mouse click leaves focus with no visible ring,
+which is what made the same behaviour a bug on that path.
+
 ## References
 
 - Design spec §3 (loop-relevant rules), §4 (Engine API this session wraps),

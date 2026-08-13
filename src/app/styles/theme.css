@@ -1,5 +1,42 @@
 @layer theme {
-  /* Intentionally empty. Theme tokens (spec §6) are written here as CSS custom
-     properties by `features/theming` in chunk 05. The layer exists from day one
-     so the cascade order never has to change. */
+  /* ADR 0003's escape hatch, used for real. `ThemeTokens` has no eye token and
+     spec §5 fixes the eyes as white, so a monochrome LCD needs a rule rather
+     than a 15th token: on `nokia` the eye is a hole in the ink, in the LCD
+     field's own colour, with an ink pupil. Both values come from tokens — no
+     literal colour enters this file. */
+  [data-theme='nokia'] .snake__eye {
+    background-color: var(--board-bg);
+  }
+
+  [data-theme='nokia'] .snake__eye::after {
+    background-color: var(--snake-head);
+  }
+
+  /* `nokia`'s `itemFood` and `snakeHead` tokens are the same ink colour by
+     design (a monochrome LCD has one ink, not two) — `entities.css`'s default
+     `.snake__tongue { background-color: var(--item-food) }` is therefore
+     1.00:1 against the head it sits on and effectively invisible. `--board-bg`
+     is the LCD field colour, the same "hole in the ink" treatment as the eye
+     rule above (chunk 05 fix round). */
+  [data-theme='nokia'] .snake__tongue {
+    background-color: var(--board-bg);
+  }
+
+  /* `neon`'s eye is `#fff` by default (entities.css); against `snakeHead`
+     `#5ffbf1` (a near-white cyan) that is 1.27:1 — the ring all but vanishes.
+     `--snake-tail` (`#0e7fa8`) clears 3:1 against the head (3.58:1) and stays
+     visibly distinct from the pupil's `#101418` (4.07:1), so the ring and its
+     pupil both still read (chunk 05 fix round). */
+  [data-theme='neon'] .snake__eye {
+    background-color: var(--snake-tail);
+  }
+
+  /* `neon` gives the apple the halo the bolt already has in entities.css. This
+     is the "a theme may override its sprites" half of spec §6 — as a rule, not
+     as a swapped component (ADR 0006). */
+  [data-theme='neon'] .sprite-apple {
+    filter: drop-shadow(
+      0 0 calc(var(--cell-size) * 0.18) color-mix(in oklab, var(--item-food) 55%, transparent)
+    );
+  }
 }

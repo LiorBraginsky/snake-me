@@ -1,0 +1,149 @@
+import type { Theme, ThemeId } from './types';
+
+export const DEFAULT_THEME_ID: ThemeId = 'dark-checker';
+
+/**
+ * `dark-checker`'s values are the ones chunk 04 shipped as the `:root` defaults
+ * in `app/styles/tokens.css` — the same 14 names, the same 14 values. A solid
+ * theme still declares a coherent cell pair: `boardStyle` is data, so flipping
+ * it must never require a colour edit.
+ */
+const THEMES: Readonly<Record<ThemeId, Theme>> = {
+  'dark-checker': {
+    id: 'dark-checker',
+    label: 'Dark checker',
+    boardStyle: 'checker',
+    tokens: {
+      boardBg: '#131820',
+      boardCellA: '#1b2230',
+      boardCellB: '#172029',
+      boardBorder: '#2f3b4d',
+      snakeHead: '#8ce563',
+      snakeBody: '#4faa4a',
+      snakeTail: '#3c8340',
+      snakeShadow: '#24512b',
+      itemFood: '#e04b4b',
+      itemFoodAccent: '#57cc99',
+      itemBoost: '#ffd166',
+      hudBg: '#10151c',
+      hudText: '#e7eef5',
+      hudAccent: '#8ce563',
+    },
+  },
+  'dark-solid': {
+    id: 'dark-solid',
+    label: 'Dark solid',
+    boardStyle: 'solid',
+    tokens: {
+      boardBg: '#0e1520',
+      boardCellA: '#0e1520',
+      boardCellB: '#131c29',
+      boardBorder: '#2b3a52',
+      snakeHead: '#7de3d1',
+      snakeBody: '#3fa8a0',
+      snakeTail: '#2d7d7a',
+      snakeShadow: '#1a4d4f',
+      itemFood: '#ff6b6b',
+      itemFoodAccent: '#9ad97f',
+      itemBoost: '#ffcf5c',
+      hudBg: '#0a0f17',
+      hudText: '#dfe8f2',
+      hudAccent: '#7de3d1',
+    },
+  },
+  'light-checker': {
+    id: 'light-checker',
+    label: 'Light checker',
+    boardStyle: 'checker',
+    tokens: {
+      boardBg: '#eef1f5',
+      boardCellA: '#e4e9ef',
+      boardCellB: '#d7dee7',
+      boardBorder: '#8c9bb0',
+      snakeHead: '#268a3a',
+      snakeBody: '#1f7a34',
+      snakeTail: '#17632a',
+      snakeShadow: '#0f4a20',
+      itemFood: '#c62828',
+      itemFoodAccent: '#2e8b57',
+      itemBoost: '#a55d00',
+      hudBg: '#f4f6f9',
+      hudText: '#1b2430',
+      hudAccent: '#1f7a34',
+    },
+  },
+  'light-solid': {
+    id: 'light-solid',
+    label: 'Light solid',
+    boardStyle: 'solid',
+    tokens: {
+      boardBg: '#f7f3e9',
+      boardCellA: '#f7f3e9',
+      boardCellB: '#efe9db',
+      boardBorder: '#a08f6f',
+      snakeHead: '#4a7ad6',
+      snakeBody: '#2f5cb8',
+      snakeTail: '#25488f',
+      snakeShadow: '#1a336b',
+      itemFood: '#c0392b',
+      itemFoodAccent: '#2e8b57',
+      itemBoost: '#8f5b00',
+      hudBg: '#fbf8f1',
+      hudText: '#2a2620',
+      hudAccent: '#2f5cb8',
+    },
+  },
+  nokia: {
+    id: 'nokia',
+    label: 'Nokia',
+    boardStyle: 'solid',
+    tokens: {
+      boardBg: '#b5c94a',
+      boardCellA: '#b5c94a',
+      boardCellB: '#adc244',
+      boardBorder: '#3f4a15',
+      snakeHead: '#1d2408',
+      snakeBody: '#2c3510',
+      snakeTail: '#3c4718',
+      snakeShadow: '#7f8f33',
+      itemFood: '#1d2408',
+      itemFoodAccent: '#3c4718',
+      itemBoost: '#2c3510',
+      hudBg: '#b5c94a',
+      hudText: '#22290b',
+      hudAccent: '#2c3510',
+    },
+  },
+  neon: {
+    id: 'neon',
+    label: 'Neon',
+    boardStyle: 'checker',
+    tokens: {
+      boardBg: '#0b0616',
+      boardCellA: '#120a24',
+      boardCellB: '#0d0719',
+      boardBorder: '#ff2fb9',
+      snakeHead: '#5ffbf1',
+      snakeBody: '#22d3ee',
+      snakeTail: '#0e7fa8',
+      snakeShadow: '#5b1b8f',
+      itemFood: '#ff2f6d',
+      itemFoodAccent: '#a8ff3e',
+      itemBoost: '#ffe14d',
+      hudBg: '#080411',
+      hudText: '#e7d9ff',
+      hudAccent: '#ff2fb9',
+    },
+  },
+};
+
+/**
+ * Picker order = declaration order. Derived from the registry rather than
+ * restated, so a theme cannot exist and go unlisted (ADR 0003: registry and UI
+ * cannot drift apart).
+ */
+export const THEME_LIST: readonly Theme[] = Object.values(THEMES);
+
+export function themeById(id: ThemeId): Theme {
+  return THEMES[id];
+}

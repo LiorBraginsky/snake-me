@@ -37,9 +37,9 @@
        rendering someone's stale copy of 24x16. */
     --app-font: system-ui, sans-serif;
     --app-gap: 1rem;
-    /* Vertical space the title, HUD and gaps take off the viewport before the
-       board gets what is left. */
-    --app-chrome-block-size: 10rem;
+    /* Vertical space the title, HUD, theme picker and gaps take off the
+       viewport before the board gets what is left. */
+    --app-chrome-block-size: 13rem;
     --stage-max-inline-size: 60rem;
     /* The wall: a ring drawn OUTSIDE the stage's layout box (box-shadow, not
        border), so the board's content box stays exactly cols x rows square

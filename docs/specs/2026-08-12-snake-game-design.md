@@ -83,7 +83,7 @@ one layer; each slice exposes a public API via its `index.ts`):
 src/
 ├── app/                          # composition layer
 │   ├── App.tsx                   #   assembles widgets, owns the game session
-│   ├── main.tsx                  #   entry: render + theme bootstrap
+│   ├── main.tsx                  #   entry: render (theme bootstrap lives in App — see architecture.md)
 │   └── styles/                   #   @layer reset, tokens, layout, theme
 ├── widgets/                      # composed UI blocks — one component per file
 │   ├── game-stage/               #   GameStage (stack, --cell-size), BoardLayer (z0,
@@ -94,12 +94,13 @@ src/
 ├── features/
 │   ├── game-session/             #   createGameSession (signals, start/pause/restart,
 │   │                             #   input binding), createGameLoop (rAF + accumulator)
+│   ├── scoreboard/               #   createScoreboardState (top-5, persisted)
 │   └── theming/                  #   themes registry, applyTheme, createThemeState
 ├── entities/
 │   └── game/                     #   types, engine (pure reducer), rules, rng port
 └── shared/
     ├── input/                    #   keyboard → ControlSignal (no game knowledge)
-    └── storage/                  #   KeyValueStore port + localStorage adapter
+    └── storage/                  #   KeyValueStore port + Web Storage adapter (injected)
 ```
 
 **Invariants (all lint-enforced, see §8):**
@@ -175,7 +176,6 @@ interface Theme {
   id: ThemeId; label: string;
   boardStyle: 'checker' | 'solid';   // checker uses cellA/cellB, solid uses boardBg
   tokens: ThemeTokens;
-  sprites: SpriteSet;                 // per-theme SVG components (apple, boost)
 }
 ```
 
@@ -185,17 +185,25 @@ interface Theme {
   `data-theme="<id>"`.
 - **Six themes:** `dark-checker` (default, classic colors), `dark-solid`,
   `light-checker`, `light-solid`, `nokia` (monochrome LCD), `neon`.
-- Themes may share one `SpriteSet` recolored via tokens (the four base themes
-  do) or override it with their own shapes (`nokia`, `neon` may).
+- All six themes share the one detailed SVG set in `widgets/game-stage`,
+  recoloured through the 14 tokens. A theme that needs a different *treatment*
+  — `nokia`'s LCD eyes, `neon`'s halo — ships a `[data-theme]` rule in
+  `app/styles/theme.css`; `Theme` carries no components, because a feature may
+  not import a widget (ADR 0006).
 - Contrast rule: snake and items must stay legible on every board background a
   theme uses (both checker cells, or the solid fill) — verified per theme at
   the demo gate.
 
 ## 7. Storage
 
-- `KeyValueStore` port: typed `get<T>` / `set<T>` with JSON serialization.
+- `KeyValueStore` port: `get<T>(key, decode)` / `set(key, value)` with JSON
+  serialisation. `decode` also receives `undefined` — missing key, unavailable
+  storage or unparseable JSON — so the default is chosen in one place and
+  valid-JSON-of-the-wrong-shape cannot reach a consumer.
 - `localStorage` adapter; versioned keys: `snake-me:theme:v1`,
-  `snake-me:scoreboard:v1`.
+  `snake-me:scoreboard:v1`. The storage object arrives as an injected provider
+  (`() => window.localStorage`), so the slice names no ambient global
+  (ADR 0005 § Amendment).
 - **Failure policy:** corrupt JSON or unavailable storage (private mode) falls
   back to defaults silently — the game must never crash because of storage.
   The engine itself is pure and cannot throw on user input.

@@ -21,11 +21,17 @@
     margin: 0;
   }
 
+  /* 0.7 left nokia's label at 4.119:1 against --hud-bg — under WCAG 1.4.3's
+     4.5:1 for 12px regular text (crossover is 0.7369). Same criterion as
+     `.overlay-panel__score-rank/date` in stage.css, so this uses the same
+     0.75, clearing nokia at 4.644:1; every other theme clears 5.4:1+
+     (light-checker 5.61, light-solid 5.47, neon 7.56, dark-* 7.9-8.1;
+     chunk 05 second fix round). */
   .hud__score-label {
     font-size: 0.75rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    opacity: 0.7;
+    opacity: 0.75;
   }
 
   .hud__score-value {
@@ -40,22 +46,45 @@
     min-block-size: 1.5rem;
   }
 
+  /* Tint carries the status colour, `--hud-text` carries the legibility — kept
+     as two separate jobs instead of one token doing both. The 22-24% tint is
+     byte-identical to what chunk 04 shipped; text switched from the tint's own
+     accent colour to `--hud-text`, which is chosen per theme to read against
+     `--hud-bg` and the chip background is only a 22-24% perturbation of that.
+     Computed (chunk 05 fix round, all six themes): worst case is nokia's
+     game-over chip at 5.31:1, with nokia's other two chips close behind
+     (default 5.77:1, boost 5.57:1); the four non-nokia themes clear
+     8.5:1-12.1:1 — all comfortably above WCAG 1.4.3's 4.5:1 for 13px/600 text.
+     (An earlier version of this fix instead lowered the tint itself to a
+     single global 1% to keep `color` equal to the tint colour; that was wrong
+     on two counts — the text colour WAS the tint colour, so any tint pulled
+     the background toward the text and away from contrast, meaning "fixing"
+     it meant shrinking the tint until the pill disappeared everywhere (1% is
+     imperceptible from `--hud-bg`), AND doing that as one global number
+     silently changed `dark-checker`'s tint too, even though `dark-checker`
+     never needed a change — it was already shipped, unmodified, in the
+     chunk 04 demo. Reverted for both reasons.) This version keeps
+     the tint untouched on every theme, `dark-checker` included, but the chip
+     *label* colour does change on every theme, `dark-checker` included — it
+     had to: `dark-checker`'s game-over chip's chunk 04 text colour (the
+     tint's own `--item-food`) sat at 3.544:1 against the tinted background, a
+     1.4.3 failure. */
   .hud__chip {
     padding: 0.2rem 0.65rem;
     border-radius: 999px;
     font-size: 0.8125rem;
     font-weight: 600;
     background-color: color-mix(in oklab, var(--hud-accent) 22%, transparent);
-    color: var(--hud-accent);
+    color: var(--hud-text);
   }
 
   .hud__chip--boost {
     background-color: color-mix(in oklab, var(--item-boost) 24%, transparent);
-    color: var(--item-boost);
+    color: var(--hud-text);
   }
 
   .hud__chip--game-over {
     background-color: color-mix(in oklab, var(--item-food) 24%, transparent);
-    color: var(--item-food);
+    color: var(--hud-text);
   }
 }
