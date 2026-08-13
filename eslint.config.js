@@ -134,6 +134,62 @@ export default tseslint.config(
   // that freedom.
   { files: ['src/**/*.test.{ts,tsx}'], rules: { 'boundaries/dependencies': 'off' } },
 
+  // The engine and the game session are headless by contract (ADR 0005): time,
+  // input and randomness arrive as injected ports, never as ambient globals.
+  // `boundaries/dependencies` structurally cannot see this — a global is not an
+  // import — so it needs its own rule. `features/theming` is deliberately NOT in
+  // this glob: writing theme tokens onto the document is exactly its job
+  // (ADR 0003). Tests are exempt for the same reason they are exempt from the
+  // boundaries rules, and because the compile-time `window` proofs live there.
+  {
+    files: ['src/entities/**/*.{ts,tsx}', 'src/features/game-session/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        { name: 'window', message: 'Headless by contract: take a port (ADR 0005).' },
+        { name: 'document', message: 'Headless by contract: take a port (ADR 0005).' },
+        { name: 'localStorage', message: 'Headless by contract: take a port (ADR 0005).' },
+        { name: 'requestAnimationFrame', message: 'Take a FrameScheduler port (ADR 0005).' },
+        { name: 'cancelAnimationFrame', message: 'Take a FrameScheduler port (ADR 0005).' },
+        { name: 'performance', message: 'Time arrives as the frame timestamp (ADR 0005).' },
+        { name: 'Date', message: 'Determinism: the caller supplies clock values (ADR 0004).' },
+        {
+          name: 'setTimeout',
+          message: 'ADR 0005 rejects setInterval/setTimeout: take a FrameScheduler port.',
+        },
+        {
+          name: 'setInterval',
+          message: 'ADR 0005 rejects setInterval/setTimeout: take a FrameScheduler port.',
+        },
+        { name: 'queueMicrotask', message: 'Headless by contract: take a port (ADR 0005).' },
+        { name: 'self', message: 'Headless by contract: take a port (ADR 0005).' },
+        { name: 'navigator', message: 'Headless by contract: take a port (ADR 0005).' },
+        { name: 'crypto', message: 'Determinism: take the Rng port (ADR 0004).' },
+        // Banning the bare identifier (not just a `globalThis.window`-shaped
+        // member access) is what actually closes the laundering route: this
+        // rule flags every reference eslint-scope resolves to the global
+        // variable `globalThis`, including one wrapped in a type assertion —
+        // `(globalThis as unknown as { window: Window }).window` still names
+        // the identifier, so it still gets caught. A `no-restricted-properties`
+        // entry keyed on the object name `globalThis` was tried first and
+        // rejected: it inspects `MemberExpression.object.name`, which is
+        // `undefined` once the object is a `TSAsExpression` rather than a bare
+        // `Identifier`, so it lints the exact adversarial case in this ADR's
+        // motivating example clean.
+        { name: 'globalThis', message: 'Headless by contract: take a port (ADR 0005).' },
+      ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message: 'Determinism: take the Rng port (ADR 0004).',
+        },
+      ],
+    },
+  },
+
   // Must stay last: switches off every stylistic rule Prettier owns.
   prettier,
 );
