@@ -110,8 +110,16 @@
   }
 
   /* 0.75, not the more obvious 0.72: at 0.72 `nokia`'s rank/date still land at
-     4.31:1 against `--hud-bg`, under WCAG 1.4.3's 4.5:1 for 13px text. 0.75
-     clears all six themes, worst case `nokia` at 4.64:1 (chunk 05 fix round). */
+     4.321:1 against `--hud-bg`, under WCAG 1.4.3's 4.5:1 for 13px text. 0.75
+     clears all six themes, worst case `nokia` at 4.64:1 (chunk 05 fix round).
+     This is a deliberate single global value, not six per-theme overrides,
+     chosen even though it also raises three themes that already cleared 4.5:1
+     at the old 0.6 (dark-checker 6.229:1, dark-solid 6.043:1, neon 5.737:1).
+     One number beating six per-theme overrides is the better trade-off, but
+     naming it here matters: `hud.css`'s `.hud__chip` comment invokes "don't
+     silently change an already-passing theme" to rule out a candidate fix,
+     and that criterion has to be stated once and applied consistently rather
+     than cited only when it argues against a change. */
   .overlay-panel__score-rank,
   .overlay-panel__score-date {
     opacity: 0.75;
