@@ -3,6 +3,8 @@
 - **Status:** proposed
 - **Date:** 2026-08-12
 - **Deciders:** Lior
+- **Narrowed by:** [ADR 0006](0006-theme-carries-no-components.md) — `Theme`
+  carries no components.
 
 ## Context
 
@@ -41,15 +43,13 @@ interface Theme {
   id: ThemeId; label: string;
   boardStyle: 'checker' | 'solid';   // checker uses cellA/cellB, solid uses boardBg
   tokens: ThemeTokens;
-  sprites: SpriteSet;                 // per-theme SVG components (apple, boost)
 }
 ```
 
 - `ThemeTokens` is a **closed record of required fields**. A theme that omits
   one fails `pnpm typecheck`. Completeness is a gate, not a checklist.
 - Structural variation is **typed data**, not a CSS trick: `boardStyle` is a
-  field the board layer branches on; `sprites` is a component set the theme
-  carries.
+  field the board layer branches on.
 - `themes.ts` holds the registry keyed by `ThemeId`; the picker enumerates the
   registry, so registry and UI cannot drift apart.
 - **`applyTheme`** is the only bridge from TypeScript to paint: it writes each
@@ -94,8 +94,9 @@ until chunk 05 — so landing the themes changes contents, never cascade order.
   gets **no** unit test: the project tests logic only (spec §8), so those halves
   are carried by the chunk 05 behavioral demo and the chunk 06 Playwright smoke.
   There is no jsdom in this project and none is coming.
-- Sprites living inside the theme object means a theme override is a data
-  change, not a conditional inside `ItemView`.
+- Sprites are **not** theme data (ADR 0006): a per-theme sprite treatment is a
+  `[data-theme]` rule, which is the same escape hatch this ADR already defines
+  for the eyes.
 
 ## Alternatives considered
 

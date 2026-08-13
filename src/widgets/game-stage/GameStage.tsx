@@ -2,8 +2,8 @@ import { Show } from 'solid-js';
 import type { JSX } from 'solid-js';
 
 import type { GameState } from '../../entities/game';
+import type { BoardStyle } from '../../features/theming';
 import { BoardLayer } from './BoardLayer';
-import type { BoardStyle } from './BoardLayer';
 import { EntityLayer } from './EntityLayer';
 import { GameOverOverlay } from './GameOverOverlay';
 import { StartOverlay } from './StartOverlay';

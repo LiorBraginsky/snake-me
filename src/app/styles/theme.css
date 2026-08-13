@@ -1,5 +1,23 @@
 @layer theme {
-  /* Intentionally empty. Theme tokens (spec §6) are written here as CSS custom
-     properties by `features/theming` in chunk 05. The layer exists from day one
-     so the cascade order never has to change. */
+  /* ADR 0003's escape hatch, used for real. `ThemeTokens` has no eye token and
+     spec §5 fixes the eyes as white, so a monochrome LCD needs a rule rather
+     than a 15th token: on `nokia` the eye is a hole in the ink, in the LCD
+     field's own colour, with an ink pupil. Both values come from tokens — no
+     literal colour enters this file. */
+  [data-theme='nokia'] .snake__eye {
+    background-color: var(--board-bg);
+  }
+
+  [data-theme='nokia'] .snake__eye::after {
+    background-color: var(--snake-head);
+  }
+
+  /* `neon` gives the apple the halo the bolt already has in entities.css. This
+     is the "a theme may override its sprites" half of spec §6 — as a rule, not
+     as a swapped component (ADR 0006). */
+  [data-theme='neon'] .sprite-apple {
+    filter: drop-shadow(
+      0 0 calc(var(--cell-size) * 0.18) color-mix(in oklab, var(--item-food) 55%, transparent)
+    );
+  }
 }

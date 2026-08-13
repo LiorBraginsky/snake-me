@@ -52,7 +52,10 @@ export function createKeyboardControls(
     }
 
     // The key belongs to the game: arrows and Space would otherwise scroll the
-    // page, and Space would also click whatever button holds focus.
+    // page, and Space would also click whatever button holds focus. A widget
+    // that needs one of these keys takes it back locally — the listener is on
+    // `window`, so any handler between the event target and `window` wins by
+    // calling stopPropagation() (see ThemeSwatch; ADR 0005 § Amendment).
     event.preventDefault();
 
     // Claimed first, suppressed second: holding an arrow must still not scroll,

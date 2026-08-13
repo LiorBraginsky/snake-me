@@ -1,0 +1,45 @@
+@layer layout {
+  .theme-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .theme-swatch {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.3rem 0.7rem 0.3rem 0.4rem;
+    border: 0;
+    border-radius: 999px;
+    background-color: color-mix(in oklab, var(--hud-text) 10%, transparent);
+    color: var(--hud-text);
+    font: inherit;
+    font-size: 0.8125rem;
+    cursor: pointer;
+  }
+
+  .theme-swatch[aria-pressed='true'] {
+    box-shadow: 0 0 0 2px var(--hud-accent);
+  }
+
+  .theme-swatch:focus-visible {
+    outline: 2px solid var(--hud-text);
+    outline-offset: 2px;
+  }
+
+  /* Board / snake / item, in that order. The three --swatch-* properties are
+     the picker's own namespace — set inline per swatch, disjoint from the 14
+     theme tokens and from chunk 04's geometry names. */
+  .theme-swatch__preview {
+    inline-size: 1.1rem;
+    block-size: 1.1rem;
+    border-radius: 50%;
+    background-image: linear-gradient(
+      135deg,
+      var(--swatch-board) 0 34%,
+      var(--swatch-snake) 34% 67%,
+      var(--swatch-item) 67% 100%
+    );
+  }
+}
