@@ -60,7 +60,7 @@ const THEMES: Readonly<Record<ThemeId, Theme>> = {
       boardCellA: '#e4e9ef',
       boardCellB: '#d7dee7',
       boardBorder: '#8c9bb0',
-      snakeHead: '#2f9e44',
+      snakeHead: '#268a3a',
       snakeBody: '#1f7a34',
       snakeTail: '#17632a',
       snakeShadow: '#0f4a20',

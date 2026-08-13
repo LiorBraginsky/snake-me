@@ -109,9 +109,12 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* 0.75, not the more obvious 0.72: at 0.72 `nokia`'s rank/date still land at
+     4.31:1 against `--hud-bg`, under WCAG 1.4.3's 4.5:1 for 13px text. 0.75
+     clears all six themes, worst case `nokia` at 4.64:1 (chunk 05 fix round). */
   .overlay-panel__score-rank,
   .overlay-panel__score-date {
-    opacity: 0.6;
+    opacity: 0.75;
   }
 
   .overlay-panel__score-value {

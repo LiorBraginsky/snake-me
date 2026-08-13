@@ -40,22 +40,31 @@
     min-block-size: 1.5rem;
   }
 
+  /* 1%, not 22-24%: text colour equals the chip's own accent, so ANY tint pulls
+     the background toward the text colour and lowers contrast. On the light
+     themes even 12% still leaves `light-checker`'s boost chip at 4.00:1,
+     under WCAG 1.4.3's 4.5:1 for 13px/600 text — 1% is the highest tint that
+     clears 4.5:1 on all six themes for all three chips (worst case
+     `dark-checker`'s game-over chip at 4.56:1; chunk 05 fix round). The chip
+     background is consequently very close to `--hud-bg` on every theme; a
+     visibly tinted pill and 4.5:1 body-text contrast are not both achievable
+     with these token values without changing the palette (out of scope here). */
   .hud__chip {
     padding: 0.2rem 0.65rem;
     border-radius: 999px;
     font-size: 0.8125rem;
     font-weight: 600;
-    background-color: color-mix(in oklab, var(--hud-accent) 22%, transparent);
+    background-color: color-mix(in oklab, var(--hud-accent) 1%, transparent);
     color: var(--hud-accent);
   }
 
   .hud__chip--boost {
-    background-color: color-mix(in oklab, var(--item-boost) 24%, transparent);
+    background-color: color-mix(in oklab, var(--item-boost) 1%, transparent);
     color: var(--item-boost);
   }
 
   .hud__chip--game-over {
-    background-color: color-mix(in oklab, var(--item-food) 24%, transparent);
+    background-color: color-mix(in oklab, var(--item-food) 1%, transparent);
     color: var(--item-food);
   }
 }
