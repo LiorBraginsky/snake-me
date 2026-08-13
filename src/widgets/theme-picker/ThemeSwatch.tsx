@@ -21,15 +21,37 @@ export function ThemeSwatch(props: ThemeSwatchProps): JSX.Element {
       class="theme-swatch"
       type="button"
       aria-pressed={props.active}
-      onClick={() => props.onSelect()}
+      onClick={(event) => {
+        props.onSelect();
+
+        // Blur only for a real pointer click (`event.detail`, the click
+        // count, is >=1 for a mouse and 0 for a keyboard-synthesised
+        // activation): a mouse click otherwise leaves the swatch focused, so
+        // Space re-activates it instead of reaching the global "start / play
+        // again" binding (spec §3), making `GameOverOverlay`'s "Space plays
+        // again too" text false until focus moves elsewhere. A keyboard user
+        // keeps focus on purpose — losing it here would fight `onKeyDown`
+        // below, which relies on the swatch staying focused so Space can both
+        // pick the theme and stay available to the adapter next time
+        // (ADR 0005 § Amendment).
+        if (event.detail > 0) {
+          event.currentTarget.blur();
+        }
+      }}
       onKeyDown={(event) => {
         if (event.key === ' ') {
-          // The keyboard adapter listens on `window` and preventDefaults Space,
-          // which it maps to "start / play again" (spec §3). This handler runs
-          // on the button — below `document`, where Solid delegates keydown, and
-          // below `window` — so stopping here leaves Space's native button
-          // activation intact and the round untouched. Nothing else the adapter
-          // owns (arrows, WASD, P, Esc) has a default action on a <button>, so
+          // The keyboard adapter listens on `window`, and Solid delegates
+          // `keydown` at `document` — both sit above this button in the
+          // bubble path, so calling `stopPropagation()` here (inside the
+          // delegated listener Solid attaches at `document`, synthesising the
+          // walk up from `event.target`) stops the walk before it reaches
+          // either one, leaving Space's native button activation intact and
+          // the round untouched. `stopPropagation()` does NOT stop other
+          // listeners on the SAME node, so this convention would silently
+          // break if `createKeyboardControls` were ever attached to
+          // `document` instead of `window` (docs/architecture.md §
+          // Enforcement, "Not yet executable"). Nothing else the adapter owns
+          // (arrows, WASD, P, Esc) has a default action on a <button>, so
           // Space is the only key a swatch takes back (ADR 0005 § Amendment).
           event.stopPropagation();
         }
