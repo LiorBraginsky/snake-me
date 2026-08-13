@@ -8,11 +8,13 @@ Frozen reasoning lives in `docs/adr/`. Gameplay and visual truth live in
 `docs/specs/2026-08-12-snake-game-design.md`. This file is the map, not the
 territory and not the argument.
 
-- **Last synced:** chunk 03 — input, session, loop
-- **State of the tree:** `app/` still renders a placeholder shell and owns the
-  CSS cascade; `entities/game`, `shared/input` and `features/game-session` are
-  live. The remaining five slices are `index.ts` stubs (a comment plus
-  `export {}`).
+- **Last synced:** chunk 04 — game stage UI
+- **State of the tree:** the game is playable in the default `dark-checker`
+  palette. `app/` composes the session, the loop and the keyboard adapter and
+  owns the CSS cascade; `widgets/game-stage`, `widgets/hud`, `features/game-session`,
+  `entities/game` and `shared/input` are live. `features/theming`,
+  `widgets/theme-picker` and `shared/storage` are still `index.ts` stubs (a
+  comment plus `export {}`).
 
 ## Layers
 
@@ -65,31 +67,29 @@ of the slice is real · `live` — complete per spec.
 
 | Module | Status | Purpose | Lands in |
 |--------|--------|---------|----------|
-| `App.tsx` | partial | Assembles widgets, owns the game session — today a title plus a `stage-placeholder` box at the board's aspect ratio | 01 shell → 04 |
+| `App.tsx` | live | Composition root: owns the session (`createGameSession`), starts `createGameLoop`, binds `createKeyboardControls`, and renders `Hud` + `GameStage`. Passes `window` as both the `FrameScheduler` and the `KeyDownTarget`, and `createSeededRng(Date.now())` as the rng (ADR 0005) | 01 → 03 → 04 |
 | `main.tsx` | partial | Entry point: mounts `<App />` into `#root`, imports the stylesheet; theme bootstrap still to come | 01 → 05 |
-| `styles/` | partial | `index.css` declares the cascade order `@layer reset, tokens, layout, theme` once and imports the four files; each file wraps its own contents in its layer | 01 → 04, 05 |
+| `styles/` | live for chunk 04 | `index.css` declares the cascade order `@layer reset, tokens, layout, theme` once and imports `reset`, `tokens`, `layout`, `stage`, `entities`, `hud`, `theme`. `tokens.css` holds the 14 `dark-checker` defaults plus the geometry properties; `stage.css`, `entities.css` and `hud.css` each wrap their contents in `@layer layout` | 01 → 04, 05 |
 
 `styles/theme.css` is deliberately **empty**: the layer exists from day one so
 the cascade order never has to change when `features/theming` starts writing
 theme tokens in chunk 05 ([ADR 0003](adr/0003-theme-model.md)).
 
-**Known duplication — board dimensions, owner chunk 04.** `styles/tokens.css`
-defines `--board-cols: 24` / `--board-rows: 16` and `styles/layout.css` derives
-the placeholder box from them (`aspect-ratio: var(--board-cols) /
-var(--board-rows)`). Those are gameplay numbers, and `CLAUDE.md` puts gameplay
-numbers in `entities/game/rules.ts` — which exists as of chunk 02 and exports
-them as `DEFAULT_RULES.cols` / `DEFAULT_RULES.rows`. This is a chunk-01
-placeholder, not a second home for the board size: **chunk 04** must derive the
-custom properties from `rules.ts` when it builds the real stage, and delete the
-literals here. Until then the board size is stated in two places and nothing
-checks that they agree.
+**Board dimensions: one home, resolved in chunk 04.** `DEFAULT_RULES.cols` /
+`.rows` in `entities/game/rules.ts` are the only copy. They reach CSS as an
+inline style at exactly two elements — `App` sets `--board-cols` / `--board-rows`
+on `.app__game` so the HUD matches the board's width, and `GameStage` sets them
+on `.stage` so the widget is self-sufficient wherever it is mounted. Both read
+the same props/constants, so there is no second literal. `tokens.css`
+deliberately defines **no fallback**: if the inline style is ever lost the board
+collapses visibly instead of quietly rendering a stale copy of 24×16.
 
 ### `widgets/` — composed UI
 
 | Slice | Status | Contents | Lands in |
 |-------|--------|----------|----------|
-| `game-stage/` | stub | `GameStage` (layer stack, owns `--cell-size`), `BoardLayer` (z0, static), `EntityLayer` (z1), `SnakeView`, `ItemView`, `StartOverlay`, `GameOverOverlay` | 04 |
-| `hud/` | stub | `Hud`, `ScoreCounter`, `StatusBadge` | 04 |
+| `game-stage/` | live | `GameStage` (layer stack + geometry root: sets `--board-cols` / `--board-rows`, is the container-query container), `BoardLayer` (z0, one gradient element, reads no accessor), `EntityLayer` (z1, promoted compositor layer), `SnakeView`, `SnakeSegment`, `ItemView`, `AppleSprite`, `BoltSprite`, `StartOverlay`, `GameOverOverlay`. **Public API: `GameStage` only** (+ `GameStageProps`, `BoardStyle`) | 04 |
+| `hud/` | live | `Hud`, `ScoreCounter`, `StatusBadge` + `statusBadgeVariant.ts` (`statusBadgeVariant` — the badge precedence, the one logic-tested function in `widgets`). **Public API: `Hud` only** (+ `HudProps`) | 04 |
 | `theme-picker/` | stub | `ThemePicker` | 05 |
 
 ### `features/` — reactive behaviour
@@ -150,6 +150,105 @@ ports structurally, and `createSeededRng(Date.now())` supplies the rng, per
 
 Theme tokens cross into CSS exactly once, in `applyTheme`; components read
 `var(--token)` and never token values in JS ([ADR 0003](adr/0003-theme-model.md)).
+
+## CSS custom property contract
+
+Two disjoint namespaces live in `app/styles`. Chunk 05 owns the first and must
+never write the second.
+
+### Theme tokens — 14, one per `ThemeTokens` field
+
+The property name is the exact kebab-case of the field name, so chunk 05's
+`applyTheme` is a mechanical camelCase→kebab transform with no lookup table.
+Defaults for `dark-checker` sit on `:root` in `tokens.css` (`@layer tokens`);
+`applyTheme` writes the same names inline on the game root, and an inline style
+outranks every `@layer` — which is why the defaults belong in the tokens layer
+and `theme.css` can stay empty (ADR 0003).
+
+| `ThemeTokens` field | CSS property | Consumed by |
+|---|---|---|
+| `boardBg` | `--board-bg` | `.stage` background, the `solid` board style, the overlay veil |
+| `boardCellA` | `--board-cell-a` | checker gradient |
+| `boardCellB` | `--board-cell-b` | checker gradient |
+| `boardBorder` | `--board-border` | the wall ring on `.stage` |
+| `snakeHead` | `--snake-head` | head tile |
+| `snakeBody` | `--snake-body` | body tiles |
+| `snakeTail` | `--snake-tail` | tail tile |
+| `snakeShadow` | `--snake-shadow` | bottom offset shadow on every segment |
+| `itemFood` | `--item-food` | apple body, its outline/highlight mixes, and the snake's tongue |
+| `itemFoodAccent` | `--item-food-accent` | apple stem + leaf |
+| `itemBoost` | `--item-boost` | bolt body, its outline mix, its halo, the boost chip |
+| `hudBg` | `--hud-bg` | page background, HUD bar, overlay panel, button text |
+| `hudText` | `--hud-text` | HUD and overlay text, focus ring |
+| `hudAccent` | `--hud-accent` | score value, default chip, primary button |
+
+Nothing type-checks these strings against `themes.ts`. A rename lands in both
+places in one commit or the widgets silently lose their paint — the seam ADR 0003
+accepts by name.
+
+### Geometry — chunk 04 owns these names, and a theme must not write them
+
+| Property | Declared by | Value |
+|---|---|---|
+| `--board-cols`, `--board-rows` | inline style from `DEFAULT_RULES`: `App` on `.app__game`, `GameStage` on `.stage` | the only crossing from `rules.ts` into CSS; no fallback on purpose |
+| `--cell-size` | `.stage__layer` in `stage.css` | `calc(100cqi / var(--board-cols))` — `.stage` is the `container-type: inline-size` container, so no JS measures anything |
+| `--segment-gap`, `--segment-radius`, `--snake-shadow-depth` | `.stage__layer` | fractions of `--cell-size` |
+| `--head-rotation` | `.snake__face[data-direction]` | `0deg` / `90deg` / `180deg` / `270deg` |
+| `--x`, `--y` | inline style per segment and item | grid coordinates, unitless, multiplied by `--cell-size` inside `transform` |
+| `--app-font`, `--app-gap`, `--app-chrome-block-size`, `--stage-max-inline-size`, `--board-wall-width` | `:root` in `tokens.css` | page and stage sizing |
+
+Structure that is data rather than colour travels as attributes:
+`data-board-style` (`checker` \| `solid` — ADR 0003's board branch) and
+`data-direction` on the head's face.
+
+**Trap — an element cannot query itself.** `.stage` establishes the container
+`--cell-size` is measured against, so no declaration *on `.stage`* may use
+`--cell-size`; a `100cqi` there would resolve against the viewport instead. That
+is why the wall is a fixed `--board-wall-width` ring and why every cell-derived
+property is declared on `.stage__layer`, one level in.
+
+**The only literal colours in the tree** are `#fff` (eye) and `#101418` (pupil)
+in `entities.css`: `ThemeTokens` has no eye token and spec §5 fixes the eyes as
+white. `#000` / `#fff` otherwise appear only as `color-mix()` anchors, never as
+paint. A monochrome theme that needs different eyes uses ADR 0003's `data-theme`
+escape hatch.
+
+### Why a tick cannot repaint the board
+
+Three mechanisms, in the order they stop work happening (spec §5, ADR 0001):
+
+1. `BoardLayer` reads no accessor — its only prop chain ends at a literal in
+   `App` — so Solid never re-runs it, and the checkerboard is one gradient
+   element rather than 384 nodes. There is nothing for a tick to invalidate.
+2. The engine keeps every surviving segment's `Point` object identity across a
+   tick, so a reference-keyed `<For>` over `snake.slice(1, -1)` inserts one row
+   and removes one row; the interior rows are never touched. Head and tail are
+   rendered separately, so a tick costs two `transform` writes whatever the
+   snake's length. `<Index>` would be wrong here, and both items go through a
+   non-keyed `<Show>` because the engine rebuilds the boost object every tick to
+   decrement `ttlTicks`.
+3. Movement only ever writes `transform` and the two coordinate properties, and
+   `.stage__layer--entities` carries `will-change: transform` so the moving half
+   of the stage owns its own compositor layer. That is the one `will-change` in
+   the tree and it is load-bearing. Verified, not asserted: DevTools → Rendering
+   → Paint flashing during a live round, per the chunk 04 demo criterion.
+
+### Hand-off to chunk 05
+
+- **Sprite components have no permanent home yet.** Spec §6 / ADR 0003 put a
+  `SpriteSet` on the `Theme` object in `features/theming`, but a feature may not
+  import a widget, so chunk 04's only legal home for `AppleSprite` /
+  `BoltSprite` was inside `widgets/game-stage`. Chunk 05 decides: move the base
+  set down into `features/theming` and pass it into `GameStage` as a prop, or
+  keep the base set in the widget and let a theme carry overrides only.
+- **`BoardStyle` is declared in `BoardLayer.tsx` for the same reason.** When
+  `Theme.boardStyle` lands, the canonical union moves to `features/theming` and
+  the widget imports it downward.
+- **`applyTheme` writes the 14 names above and nothing else.** Writing a
+  geometry property from a theme would put a gameplay or layout number in
+  `themes.ts`, which `CLAUDE.md` forbids.
+- **Eye and pupil colours need a `data-theme` rule** if `nokia` or `neon` wants
+  them monochrome — there is no token to reach for.
 
 ## Enforcement
 
@@ -218,6 +317,14 @@ fails `pnpm lint`.
 
 `eslint.config.js` and `tsconfig.json` are authoritative; this table is a
 pointer. If a rule name or mechanism changes there, update this row.
+
+**Trap — colocated names can collide on case alone.** Chunk 04 first named
+`widgets/hud`'s logic module `statusBadge.ts`, next to `StatusBadge.tsx`; `tsc
+--noEmit` refused with TS1149/TS1261 because TypeScript treats the two paths as
+the same file regardless of filesystem case-sensitivity. It shipped as
+`statusBadgeVariant.ts` — a slice-internal logic module cannot share a name with
+the case-variant of a component file colocated beside it, and `tsc`, not the
+filesystem, is what enforces that.
 
 ### Trap: four things make the boundaries gate real
 
@@ -300,9 +407,9 @@ mistake recurs (`.claude/orchestration.md` § Harvest):
 
 - one component per file; no grab-bag util module *inside* a slice — a grab-bag
   *outside* every slice is already a lint error (`boundaries/no-unknown-files`)
-- all gameplay numbers as named constants in `entities/game/rules.ts` — with one
-  live exception, the board dimensions in `app/styles/tokens.css` (see
-  [`app/`](#app--composition)), owned by chunk 04
+- all gameplay numbers as named constants in `entities/game/rules.ts` — with no
+  exceptions since chunk 04 (`app/styles/tokens.css` no longer restates the
+  board size; see [`app/`](#app--composition))
 - zero `eslint-disable` comments anywhere in the tree — the boundaries exception
   for tests lives in `eslint.config.js` and nowhere else
 
