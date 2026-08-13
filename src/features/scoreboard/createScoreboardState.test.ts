@@ -1,3 +1,4 @@
+import { createEffect, createRoot } from 'solid-js';
 import { describe, expect, it } from 'vitest';
 
 import { createScoreboardState } from './createScoreboardState';
@@ -118,5 +119,37 @@ describe('createScoreboardState', () => {
     state.record(10);
 
     expect(state.entries()).toHaveLength(1);
+  });
+
+  it('does not re-enter when `record` is called from a tracked scope (untrack, not entries())', () => {
+    const { state } = harness();
+    let runs = 0;
+
+    // `dispose` is captured from inside the root and called AFTER `createRoot`
+    // returns, not before: the initial run of a `createEffect` is queued while
+    // the root's callback is still executing and only flushed once that
+    // callback returns, so disposing inside the callback (before returning)
+    // would tear the root down before the effect ever got to run at all.
+    const dispose = createRoot((disposeRoot) => {
+      createEffect(() => {
+        runs += 1;
+        // Guards the test process, not the assertion: if `record` ever reads
+        // `entries` in a tracked way again, its own `setEntries` re-triggers
+        // this effect, which calls `record` again, which writes again — a
+        // runaway with no guard at all. The assertion below is `runs` staying
+        // at 1; this cap only stops the run from being literally infinite.
+        if (runs > 20) {
+          return;
+        }
+
+        state.record(runs);
+      });
+
+      return disposeRoot;
+    });
+
+    dispose();
+
+    expect(runs).toBe(1);
   });
 });

@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-
 import { describe, expect, it } from 'vitest';
 
 import { themeCustomProperties } from './applyTheme';
@@ -10,19 +8,24 @@ import type { ThemeTokens } from './types';
  * `applyTheme` itself writes to `document.documentElement` and calls
  * `setAttribute` — both need a DOM to observe, and this project's testing
  * policy (spec §8, ADR 0005) fixes `environment: 'node'` permanently, with no
- * jsdom. Two mutants therefore stay uncovered here on purpose: swapping
- * `documentElement` for `body`, and dropping the `data-theme` `setAttribute`
- * call. Chasing them would mean either adding jsdom (rejected repo-wide) or
- * threading a fake-root parameter into `applyTheme` for the sole purpose of
- * being spied on in a test — shaping a production API around a test's needs.
- * Both stay carried by the chunk 05 demo gate instead.
+ * jsdom. Mutants in the DOM writes themselves therefore stay uncovered here on
+ * purpose: swapping `documentElement` for `body`, dropping the `data-theme`
+ * `setAttribute` call, and corrupting the `data-theme` write itself (e.g.
+ * `'data-theme'` -> `'data-thema'`). Chasing them would mean either adding
+ * jsdom (rejected repo-wide) or threading a fake-root parameter into
+ * `applyTheme` for the sole purpose of being spied on in a test — shaping a
+ * production API around a test's needs. All of them stay carried by the
+ * chunk 05 demo gate instead.
  *
  * What IS fully mechanical — and was previously untested — is the transform
  * `themeCustomProperties` performs: camelCase field name -> `--kebab-case`
  * custom property, for exactly the 14 names `docs/architecture.md`'s CSS
  * custom property contract table promises. That is what this file makes
- * executable, including a cross-check against `app/styles/tokens.css` itself
- * so the "frozen contract" is a passing test, not a paragraph.
+ * executable. The other half of that contract — that `app/styles/tokens.css`
+ * actually declares all 14 names — is a cross-check between this slice and
+ * `app`, which is not a sibling this test's carve-out covers (`CLAUDE.md`:
+ * imports point down only); it lives in `test/theme-token-contract.test.ts`
+ * instead, one layer above both.
  */
 
 const SAMPLE_TOKENS: ThemeTokens = {
@@ -78,21 +81,6 @@ describe('themeCustomProperties', () => {
       for (const [field, property] of FIELD_TO_PROPERTY) {
         expect(properties[property]).toBe(theme.tokens[field]);
       }
-    }
-  });
-
-  it('names a subset of the custom properties tokens.css declares on :root', () => {
-    const css = readFileSync(new URL('../../app/styles/tokens.css', import.meta.url), 'utf-8');
-    const rootBlock = /:root\s*{([^}]*)}/.exec(css)?.[1] ?? '';
-    const declaredNames = new Set(
-      [...rootBlock.matchAll(/(--[a-z-]+)\s*:/g)].map(([, name]) => name),
-    );
-
-    // Filtered against the 14-name literal above, not by trying to classify
-    // what else lives in :root — the geometry properties are legitimately
-    // there too, and are not theme tokens.
-    for (const property of EXPECTED_PROPERTY_NAMES) {
-      expect(declaredNames.has(property)).toBe(true);
     }
   });
 });
