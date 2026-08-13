@@ -275,9 +275,15 @@ moved elsewhere. `ThemeSwatch`'s `onClick` now blurs the button, but only when
 `event.detail > 0` (a real pointer click reports a click count of 1 or more; a
 keyboard-synthesised activation of a button reports `0`). A keyboard user who
 just picked a theme with Enter or Space keeps focus on the swatch — losing it
-would be a second, needless behaviour change beyond the actual bug, since
-`onKeyDown`'s `stopPropagation()` above already lets a focused swatch keep
-steering the snake with arrows.
+would be a second, needless behaviour change beyond the actual bug. Arrows
+still steer the snake while a swatch holds focus for an unrelated reason:
+`onKeyDown`'s handler above checks `event.key === ' '` and does nothing for
+any other key, arrows included, so it never calls `stopPropagation()` for
+them and they reach the adapter untouched. Keeping keyboard focus on the
+swatch is acceptable on its own terms — a keyboard user has a visible
+`:focus-visible` ring, so a swatch holding Space (and consuming that one key)
+is not surprising, whereas a mouse click leaves focus with no visible ring,
+which is what made the same behaviour a bug on that path.
 
 ## References
 

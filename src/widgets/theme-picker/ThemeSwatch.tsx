@@ -30,10 +30,13 @@ export function ThemeSwatch(props: ThemeSwatchProps): JSX.Element {
         // Space re-activates it instead of reaching the global "start / play
         // again" binding (spec §3), making `GameOverOverlay`'s "Space plays
         // again too" text false until focus moves elsewhere. A keyboard user
-        // keeps focus on purpose — losing it here would fight `onKeyDown`
-        // below, which relies on the swatch staying focused so Space can both
-        // pick the theme and stay available to the adapter next time
-        // (ADR 0005 § Amendment).
+        // keeps focus on purpose: they have a visible `:focus-visible` ring,
+        // so a swatch holding Space is not surprising, unlike the invisible
+        // focus a mouse click leaves behind. That focus does NOT make Space
+        // available to the adapter — `onKeyDown` below calls
+        // `stopPropagation()` for Space specifically, so while a swatch is
+        // focused, Space always activates the swatch and never reaches the
+        // adapter (ADR 0005 § Amendment).
         if (event.detail > 0) {
           event.currentTarget.blur();
         }

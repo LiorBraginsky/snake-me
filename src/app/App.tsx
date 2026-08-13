@@ -48,8 +48,14 @@ export function App(): JSX.Element {
   // `scoreboard`, and `createRoot` only *happens* to defer effects past the
   // end of this function body today — hoisting this block to the top (as it
   // shipped before this fix) relies on that deferral rather than on scoping,
-  // so a future switch to `createRenderEffect` would turn it into a TDZ
-  // `ReferenceError` that no lint rule or type check would catch.
+  // so a future switch to `createRenderEffect` would run this callback
+  // synchronously, inside the TDZ window where `scoreboard` is not yet
+  // initialised. Today it survives that anyway, because the `scoreboard`
+  // reference sits behind an `if (value === 'game-over')` guard the initial
+  // status never satisfies — but that is a property of this specific
+  // callback, not of the pattern: a future control whose initial value IS
+  // `game-over` would dereference `scoreboard` inside the guard and throw.
+  // No lint rule or type check catches either the TDZ read or its absence.
   const status = createMemo(() => session.state().status);
   createEffect(
     on(status, (value) => {
