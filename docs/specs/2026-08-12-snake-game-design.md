@@ -83,7 +83,7 @@ one layer; each slice exposes a public API via its `index.ts`):
 src/
 ├── app/                          # composition layer
 │   ├── App.tsx                   #   assembles widgets, owns the game session
-│   ├── main.tsx                  #   entry: render + theme bootstrap
+│   ├── main.tsx                  #   entry: render (theme bootstrap lives in App — see architecture.md)
 │   └── styles/                   #   @layer reset, tokens, layout, theme
 ├── widgets/                      # composed UI blocks — one component per file
 │   ├── game-stage/               #   GameStage (stack, --cell-size), BoardLayer (z0,

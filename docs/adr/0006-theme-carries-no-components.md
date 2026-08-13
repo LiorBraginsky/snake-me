@@ -80,6 +80,17 @@ bolt already has in `entities.css`, via `filter: drop-shadow(...)` keyed off
   `--swatch-*` namespace — never the frozen 14, never a geometry property.
 - Nothing in spec §6 asked for a genuinely different sprite shape per theme;
   "may bring their own shapes" is satisfied by the `data-theme` treatment.
+- **`ThemePicker` stays `role="group"` with `aria-pressed`, not
+  `role="radiogroup"` with `aria-checked`, and this is a direct consequence of
+  FORK 2 meeting this widget (chunk 05 fix round).** Six independent toggle
+  buttons is a less precise model than a single-select radio group — only one
+  swatch is ever `aria-pressed="true"` — but ARIA's `radiogroup` role obliges
+  arrow-key navigation *between* the radios (the platform convention a screen
+  reader user would expect). FORK 2 deliberately leaves the arrow keys to the
+  snake: the keyboard adapter owns them globally, and `ThemePicker`'s swatches
+  are plain tab stops precisely so a focused swatch does not intercept them.
+  Advertising `radiogroup` semantics the widget cannot honour would be worse
+  than the toggle-group approximation it would replace.
 
 ## References
 

@@ -80,7 +80,13 @@ until chunk 05 — so landing the themes changes contents, never cascade order.
   paint. A rename must land in both places in one commit. Nothing type-checks
   the string names against the stylesheet — this is the seam in the design, and
   it is why the names are treated as a contract rather than an implementation
-  detail.
+  detail. **Closed on the emit side as of the chunk 05 fix round:**
+  `features/theming/applyTheme.test.ts` asserts `themeCustomProperties` emits
+  exactly the 14 frozen names for every registered theme, and cross-checks that
+  all 14 are declared on `tokens.css`'s `:root`. The CSS side is checked as a
+  subset (tokens.css may legitimately declare more, e.g. geometry), not proven
+  exhaustive the other way — a name renamed in `themes.ts` but never removed
+  from `tokens.css` would still pass. The seam is narrower, not gone.
 - **Cost — contrast is not type-checkable.** "Snake and items stay legible on
   every board background a theme uses" (spec §6) survives only as a behavioral
   demo criterion in chunk 05. The compiler guarantees a theme is *complete*, not

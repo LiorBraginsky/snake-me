@@ -250,6 +250,35 @@ because a focused button must keep steering the snake. Revisit when the tree
 actually grows a text input or a `<select>`; until then this is a predicate with
 no caller.
 
+**Correction (chunk 05 fix round):** the mechanism above is described slightly
+wrong in both this ADR and in `ThemeSwatch.tsx`'s original comment.
+`onKeyDown`'s handler does not run "on the button" as a literal DOM listener —
+Solid registers one delegated listener at `document` and synthesises the walk
+from `event.target` upward, calling each JSX `onKeyDown` prop it passes in
+turn. The conclusion is unaffected (that walk still finishes above the button
+and below both `document`'s delegated listener and `window`, so
+`stopPropagation()` there still wins before the keyboard adapter sees the
+event), but the correct wording exposes a real fragility worth recording:
+`stopPropagation()` does **not** stop other listeners on the *same* node — if
+`createKeyboardControls` were ever attached to `document` instead of `window`,
+Solid's delegated listener and the adapter's listener would be two handlers on
+the same node, and this whole convention would silently stop working with no
+lint rule or type error to catch it (`docs/architecture.md` § Enforcement,
+"Not yet executable", carries this as a lint-rule candidate: the keyboard
+adapter's target stays `window`).
+
+**Also fixed, same review round:** a mouse click on a swatch left it focused,
+so a subsequent Space press re-activated the swatch (native button behaviour)
+instead of reaching the adapter's global "start / play again" binding —
+making `GameOverOverlay`'s "Space plays again too" text false until focus
+moved elsewhere. `ThemeSwatch`'s `onClick` now blurs the button, but only when
+`event.detail > 0` (a real pointer click reports a click count of 1 or more; a
+keyboard-synthesised activation of a button reports `0`). A keyboard user who
+just picked a theme with Enter or Space keeps focus on the swatch — losing it
+would be a second, needless behaviour change beyond the actual bug, since
+`onKeyDown`'s `stopPropagation()` above already lets a focused swatch keep
+steering the snake with arrows.
+
 ## References
 
 - Design spec §3 (loop-relevant rules), §4 (Engine API this session wraps),

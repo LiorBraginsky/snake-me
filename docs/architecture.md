@@ -72,9 +72,11 @@ of the slice is real · `live` — complete per spec.
 | `main.tsx` | live | Entry point: mounts `<App />`, imports the stylesheet. The theme bootstrap deliberately lives in `App` instead: the theme state is shared with the picker and the board, and `App`'s body runs synchronously inside `render()`, before the first paint, so there is nothing a pre-mount hook would add | 01 → 05 |
 | `styles/` | live | `index.css` declares the cascade order `@layer reset, tokens, layout, theme` once and imports `reset`, `tokens`, `layout`, `stage`, `entities`, `hud`, `theme-picker`, `theme`. `tokens.css` holds the 14 `dark-checker` defaults plus the geometry properties; `stage.css`, `entities.css`, `hud.css` and `theme-picker.css` each wrap their contents in `@layer layout`; `theme.css` wraps its contents in `@layer theme` | 01 → 04, 05 |
 
-`styles/theme.css` holds two `[data-theme='…']` escape-hatch rules (`nokia`'s
-monochrome eyes, `neon`'s apple halo — [ADR 0006](adr/0006-theme-carries-no-components.md))
-and stays empty **of token declarations**, which is what ADR 0003's original
+`styles/theme.css` holds four `[data-theme='…']` escape-hatch treatments
+(`nokia`'s monochrome eyes and tongue, `neon`'s apple halo and eye ring — the
+tongue and eye ring are contrast fixes from the chunk 05 review — see
+[ADR 0006](adr/0006-theme-carries-no-components.md)) and stays empty **of
+token declarations**, which is what ADR 0003's original
 sentence about this file was actually about: the layer existed from day one so
 the cascade order never had to change when `features/theming` started writing
 theme tokens in chunk 05, and it still holds none — `applyTheme` writes the 14
@@ -199,20 +201,20 @@ background included.
 
 | `ThemeTokens` field | CSS property | Consumed by |
 |---|---|---|
-| `boardBg` | `--board-bg` | `.stage` background, the `solid` board style, the overlay veil |
+| `boardBg` | `--board-bg` | `.stage` background, the `solid` board style, the overlay veil, `nokia`'s tongue (`[data-theme]` escape hatch, chunk 05 fix round) |
 | `boardCellA` | `--board-cell-a` | checker gradient |
 | `boardCellB` | `--board-cell-b` | checker gradient |
 | `boardBorder` | `--board-border` | the wall ring on `.stage` |
 | `snakeHead` | `--snake-head` | head tile |
 | `snakeBody` | `--snake-body` | body tiles |
-| `snakeTail` | `--snake-tail` | tail tile |
+| `snakeTail` | `--snake-tail` | tail tile, `neon`'s eye ring (`[data-theme]` escape hatch, chunk 05 fix round) |
 | `snakeShadow` | `--snake-shadow` | bottom offset shadow on every segment |
 | `itemFood` | `--item-food` | apple body, its outline/highlight mixes, the snake's tongue, and the HUD's game-over chip |
 | `itemFoodAccent` | `--item-food-accent` | apple stem + leaf |
 | `itemBoost` | `--item-boost` | bolt body, its outline mix, its halo, the boost chip |
 | `hudBg` | `--hud-bg` | page background, HUD bar, overlay panel, button text |
-| `hudText` | `--hud-text` | page text, HUD text and hairline, overlay text, focus ring |
-| `hudAccent` | `--hud-accent` | score value, default chip, primary button |
+| `hudText` | `--hud-text` | page text, HUD text and hairline, overlay text, focus ring, and (`theme-picker.css`) the swatch pill's tint, its label text and its focus ring |
+| `hudAccent` | `--hud-accent` | score value, default chip, primary button, and (`theme-picker.css`) the swatch's `[aria-pressed='true']` ring |
 
 Nothing type-checks these strings against `themes.ts`. A rename lands in both
 places in one commit or the widgets silently lose their paint — the seam ADR 0003
@@ -339,6 +341,7 @@ it stops being a rule.
 | Every file under `src/` belongs to a slice | `pnpm lint` | `boundaries/no-unknown-files: "error"` — a `.ts` / `.tsx` file matching no `boundaries/elements` pattern is an error in its own right, not merely unimportable |
 | Solid reactivity / JSX correctness | `pnpm lint` | `eslint-plugin-solid` `flat/typescript` preset — its reactivity rules ship as `warn`, so `--max-warnings=0` is what turns them into a failure |
 | Theme token completeness | `pnpm typecheck` | `ThemeTokens` is a closed required record |
+| The 14-name emit contract (`applyTheme.ts`'s camelCase -> `--kebab-case` transform) | `pnpm test` | `features/theming/applyTheme.test.ts` (chunk 05 fix round): asserts the transform emits exactly the 14 frozen property names for a sample `ThemeTokens`, that every registered theme's 14 values survive the transform unchanged, and cross-checks (via `readFileSync` on `app/styles/tokens.css`, not an import) that all 14 names are declared on its `:root`. Review-enforced before this row landed, now gate-enforced on the emit side; the CSS side is checked as a subset, not proven exhaustive. `applyTheme`'s two DOM effects (writing `document.documentElement`, calling `setAttribute`) stay outside `pnpm test` — no jsdom, per spec §8 — and are carried by the demo gate |
 | TS strict across the repo | `pnpm typecheck` | `tsc --noEmit`, `strict: true` |
 | Engine determinism (seeded RNG, golden tests) | `pnpm test` | vitest, environment `node` — and `node` is the **final** state, not a staging one: the project tests logic only (spec §8), so jsdom is never added |
 | Session, engine, scoreboard and `shared/**` are headless (no ambient DOM, clock, scheduling or randomness) | `pnpm lint` | Two rules, scoped as of chunk 05 to `src/entities/**`, `src/features/game-session/**`, `src/features/scoreboard/**` and `src/shared/**`, tests excluded. `no-restricted-globals` bans direct references to `window`, `document`, `localStorage`, `requestAnimationFrame`, `cancelAnimationFrame`, `performance`, `Date`, `setTimeout`, `setInterval`, `queueMicrotask`, `self`, `navigator`, `crypto` and `globalThis` — it flags every reference eslint-scope resolves to that identifier, so a type-cast wrapper (`(globalThis as unknown as { window: Window }).window`) does not launder it past the rule. `no-restricted-properties` separately bans the *property* `Math.random` — `Math.max` / `.floor` / `.round` / `.imul` stay legal — but only when `Math` is a bare identifier: a cast on `Math` itself (`(Math as unknown as { random(): number }).random()`) is NOT caught by either rule; no test in this codebase relies on that gap being closed. `features/theming` is deliberately out of scope ([ADR 0003](adr/0003-theme-model.md)): writing theme tokens onto `document` is that slice's job. `src/shared/**` joined the glob in chunk 05 **with no carve-out**: `shared/storage`'s `createWebStorageStore` takes the storage object as an injected provider (`() => window.localStorage`) rather than naming `localStorage` itself, so nothing under `shared/**` needs an ambient global; `features/scoreboard` joined for the same reason `game-session` is in the glob — the ISO date is an injected `now: () => string` ([ADR 0005 § Amendment](adr/0005-headless-session-ports.md)). The widened rule was re-proven with a deliberate violation before merge: a probe `localStorage.getItem(...)` in `shared/storage/keyValueStore.ts` produced `'localStorage' is restricted from being used. Headless by contract: take a port (ADR 0005)`, and the same probe pattern with `new Date().toISOString()` in `features/theming/applyTheme.ts` produced no `no-restricted-globals` error at all (only an unrelated unused-variable error) — proving both the rule's reach over `shared/**` and `features/theming`'s exclusion boundary in the same run |
@@ -487,6 +490,13 @@ mistake recurs (`.claude/orchestration.md` § Harvest):
   board size; see [`app/`](#app--composition))
 - zero `eslint-disable` comments anywhere in the tree — the boundaries exception
   for tests lives in `eslint.config.js` and nowhere else
+- **the keyboard adapter's target stays `window`.** `ThemeSwatch`'s
+  `stopPropagation()` convention (§ Data flow, ADR 0005 § Amendment) works
+  because `createKeyboardControls` listens on `window`, one hop above where
+  Solid delegates `keydown` (`document`); `stopPropagation()` does not stop
+  other listeners on the *same* node, so attaching the adapter to `document`
+  instead would put it on the same node as Solid's delegated listener and
+  silently break the convention with no type error or lint failure
 
 ## Adding a new slice
 
